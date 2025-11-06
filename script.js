@@ -14,6 +14,8 @@ class SplineGenerator {
         this.splinePoints = [];
         this.shapes = [];
         this.lastSampleTime = 0;
+        this.selectedPoints = new Set(); // Track selected points
+        this.lastSelectedIndex = -1; // For shift selection
         
         // Draw grid after everything is initialized
         setTimeout(() => {
@@ -46,6 +48,17 @@ class SplineGenerator {
         this.saveSettingsBtn = document.getElementById('saveSettings');
         this.resetSettingsBtn = document.getElementById('resetSettings');
         this.closeBtn = document.querySelector('.close');
+        
+        // Side panel elements
+        this.tabButtons = document.querySelectorAll('.tab-btn');
+        this.splineTableBody = document.getElementById('splineTableBody');
+        this.shapesTableBody = document.getElementById('shapesTableBody');
+        this.selectAllPointsBtn = document.getElementById('selectAllPoints');
+        this.bulkVelocityInput = document.getElementById('bulkVelocity');
+        this.applyBulkVelocityBtn = document.getElementById('applyBulkVelocity');
+        this.pointCountDisplay = document.getElementById('pointCount');
+        this.selectedCountDisplay = document.getElementById('selectedCount');
+        this.shapesCountDisplay = document.getElementById('shapesCount');
         
         console.log('Elements initialized successfully');
     }
@@ -142,6 +155,34 @@ class SplineGenerator {
             this.splineCanvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
             this.splineCanvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
             this.splineCanvas.addEventListener('mouseleave', (e) => this.handleMouseUp(e));
+        }
+        
+        // Tab events
+        if (this.tabButtons) {
+            this.tabButtons.forEach(btn => {
+                btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+            });
+        }
+        
+        // Side panel events
+        if (this.selectAllPointsBtn) {
+            this.selectAllPointsBtn.addEventListener('change', (e) => this.toggleSelectAllPoints(e.target.checked));
+        }
+        
+        if (this.applyBulkVelocityBtn) {
+            this.applyBulkVelocityBtn.addEventListener('click', () => this.applyBulkVelocity());
+        }
+        
+        // Event listener per il checkbox "Seleziona tutto"
+        const selectAllCheckbox = document.getElementById('selectAllPoints');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    this.selectAllPoints();
+                } else {
+                    this.clearSelection();
+                }
+            });
         }
         
         // Settings inputs
@@ -469,6 +510,7 @@ class SplineGenerator {
             this.splinePoints.push(worldPos);
             this.drawSpline();
         }
+        this.updateSplineTable();
     }
 
     continueSampling(worldPos) {
@@ -483,6 +525,7 @@ class SplineGenerator {
         if (distance >= this.settings.samplingDistance) {
             this.splinePoints.push(worldPos);
             this.drawSpline();
+            this.updateSplineTable();
         }
     }
 
@@ -567,6 +610,7 @@ class SplineGenerator {
         this.shapes.push({ ...this.tempShape });
         this.tempShape = null;
         this.redrawShapes();
+        this.updateShapesTable();
     }
 
     drawShapePreview() {
@@ -628,6 +672,382 @@ class SplineGenerator {
         this.splineCanvas.style.cursor = cursor;
     }
 
+    // Side Panel Management
+    switchTab(tabId) {
+        // Update tab buttons
+        this.tabButtons.forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+        
+        // Update tab content
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+    }
+
+    updateSplineTable() {
+        if (!this.splineTableBody) return;
+        
+        this.splineTableBody.innerHTML = '';
+        
+        this.splinePoints.forEach((point, index) => {
+            if (!point.velocity) point.velocity = 30; // Default velocity in mm/s
+            if (!point.id) point.id = index + 1;
+            
+            const row = document.createElement('tr');
+            const isSelected = this.selectedPoints.has(index);
+            if (isSelected) row.classList.add('selected');
+            
+            row.innerHTML = `
+                <td><input type="checkbox" class="point-checkbox" data-index="${index}" ${isSelected ? 'checked' : ''}></td>
+                <td>${point.id}</td>
+                <td>${point.x.toFixed(2)}</td>
+                <td>${point.y.toFixed(2)}</td>
+                <td><input type="number" class="velocity-input" data-index="${index}" value="${point.velocity}" min="0" step="0.1"></td>
+                <td>
+                    <button class="btn-mini edit" onclick="window.splineApp.focusPoint(${index})">📍</button>
+                    <button class="btn-mini" onclick="window.splineApp.removePoint(${index})">🗑️</button>
+                </td>
+            `;
+            this.splineTableBody.appendChild(row);
+        });
+        
+        // Add event listeners for velocity inputs
+        document.querySelectorAll('.velocity-input').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                this.splinePoints[index].velocity = parseFloat(e.target.value);
+            });
+        });
+        
+        // Add event listeners for checkboxes with shift selection
+        document.querySelectorAll('.point-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('click', (e) => this.handlePointSelection(e));
+        });
+        
+        this.updatePointCount();
+        this.updateSelectedCount();
+        this.highlightSelectedPoints();
+    }
+
+    updatePointCount() {
+        const pointCountElement = document.getElementById('pointCount');
+        if (pointCountElement) {
+            pointCountElement.textContent = `${this.splinePoints.length} punti`;
+        }
+    }
+
+    updateSelectedCount() {
+        const selectedCountElement = document.getElementById('selectedCount');
+        if (selectedCountElement) {
+            selectedCountElement.textContent = `${this.selectedPoints.size} selezionati`;
+        }
+        
+        // Update select all checkbox
+        const selectAllCheckbox = document.getElementById('selectAllPoints');
+        if (selectAllCheckbox) {
+            if (this.splinePoints.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (this.selectedPoints.size === this.splinePoints.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else if (this.selectedPoints.size > 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            }
+        }
+    }
+
+    updateShapesTable() {
+        if (!this.shapesTableBody) return;
+        
+        this.shapesTableBody.innerHTML = '';
+        
+        this.shapes.forEach((shape, index) => {
+            if (!shape.id) shape.id = index + 1;
+            
+            const dimensions = this.getShapeDimensions(shape);
+            const position = this.getShapePosition(shape);
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${shape.id}</td>
+                <td>${shape.type === 'rectangle' ? 'Rettangolo' : 'Cerchio'}</td>
+                <td>${position.x.toFixed(2)}</td>
+                <td>${position.y.toFixed(2)}</td>
+                <td>${dimensions}</td>
+                <td>
+                    <button class="btn-mini edit" onclick="window.splineApp.focusShape(${index})">📍</button>
+                    <button class="btn-mini" onclick="window.splineApp.removeShape(${index})">🗑️</button>
+                </td>
+            `;
+            this.shapesTableBody.appendChild(row);
+        });
+        
+        this.updateShapesCount();
+    }
+
+    getShapeDimensions(shape) {
+        const width = Math.abs(shape.end.x - shape.start.x);
+        const height = Math.abs(shape.end.y - shape.start.y);
+        
+        if (shape.type === 'rectangle') {
+            return `${width.toFixed(1)} × ${height.toFixed(1)} mm`;
+        } else if (shape.type === 'circle') {
+            const radius = Math.sqrt(width * width + height * height);
+            return `⌀ ${(radius * 2).toFixed(1)} mm`;
+        }
+        return '';
+    }
+
+    getShapePosition(shape) {
+        if (shape.type === 'rectangle') {
+            return {
+                x: Math.min(shape.start.x, shape.end.x),
+                y: Math.min(shape.start.y, shape.end.y)
+            };
+        } else if (shape.type === 'circle') {
+            return shape.start; // Center of circle
+        }
+        return { x: 0, y: 0 };
+    }
+
+    updatePointCount() {
+        if (this.pointCountDisplay) {
+            this.pointCountDisplay.textContent = `${this.splinePoints.length} punti`;
+        }
+    }
+
+    handlePointSelection(e) {
+        const checkbox = e.target;
+        const index = parseInt(checkbox.dataset.index);
+        const isShiftPressed = e.shiftKey;
+        
+        if (isShiftPressed && this.lastSelectedIndex !== -1) {
+            // Shift selection: select range
+            const start = Math.min(this.lastSelectedIndex, index);
+            const end = Math.max(this.lastSelectedIndex, index);
+            
+            // Clear previous selection if not holding Ctrl
+            if (!e.ctrlKey) {
+                this.selectedPoints.clear();
+            }
+            
+            // Select range
+            for (let i = start; i <= end; i++) {
+                this.selectedPoints.add(i);
+                const cb = document.querySelector(`.point-checkbox[data-index="${i}"]`);
+                if (cb) cb.checked = true;
+            }
+        } else {
+            // Normal selection
+            if (checkbox.checked) {
+                this.selectedPoints.add(index);
+            } else {
+                this.selectedPoints.delete(index);
+            }
+        }
+        
+        this.lastSelectedIndex = index;
+        this.updateSelectedCount();
+        this.updateTableSelection();
+        this.highlightSelectedPoints();
+    }
+
+    updateTableSelection() {
+        // Update row styling based on selection
+        document.querySelectorAll('#splineTableBody tr').forEach((row, index) => {
+            if (this.selectedPoints.has(index)) {
+                row.classList.add('selected');
+            } else {
+                row.classList.remove('selected');
+            }
+        });
+    }
+
+    highlightSelectedPoints() {
+        // Redraw spline to clear previous highlights
+        this.drawSpline();
+        
+        // Highlight selected points on canvas
+        if (this.selectedPoints.size > 0) {
+            this.splineCtx.save();
+            this.splineCtx.strokeStyle = '#ff6600';
+            this.splineCtx.fillStyle = '#ff6600';
+            this.splineCtx.lineWidth = 3;
+            
+            this.selectedPoints.forEach(index => {
+                if (index < this.splinePoints.length) {
+                    const point = this.splinePoints[index];
+                    const screenPos = this.worldToScreen(point.x, point.y);
+                    
+                    // Draw selection ring
+                    this.splineCtx.beginPath();
+                    this.splineCtx.arc(screenPos.x, screenPos.y, 8, 0, 2 * Math.PI);
+                    this.splineCtx.stroke();
+                    
+                    // Draw filled center
+                    this.splineCtx.beginPath();
+                    this.splineCtx.arc(screenPos.x, screenPos.y, 4, 0, 2 * Math.PI);
+                    this.splineCtx.fill();
+                }
+            });
+            
+            this.splineCtx.restore();
+        }
+    }
+
+    updateSelectedCount() {
+        if (this.selectedCountDisplay) {
+            this.selectedCountDisplay.textContent = `${this.selectedPoints.size} selezionati`;
+        }
+    }
+
+    updateShapesCount() {
+        if (this.shapesCountDisplay) {
+            this.shapesCountDisplay.textContent = `${this.shapes.length} geometrie`;
+        }
+    }
+
+    toggleSelectAllPoints(selectAll) {
+        if (selectAll) {
+            // Select all points
+            this.selectedPoints.clear();
+            for (let i = 0; i < this.splinePoints.length; i++) {
+                this.selectedPoints.add(i);
+            }
+        } else {
+            // Deselect all points
+            this.selectedPoints.clear();
+        }
+        
+        // Update checkboxes
+        document.querySelectorAll('.point-checkbox').forEach((checkbox, index) => {
+            checkbox.checked = selectAll;
+        });
+        
+        this.updateSelectedCount();
+        this.updateTableSelection();
+        this.highlightSelectedPoints();
+    }
+
+    applyBulkVelocity() {
+        const velocity = parseFloat(this.bulkVelocityInput.value);
+        if (isNaN(velocity) || velocity < 0) {
+            alert('Inserire una velocità valida (mm/s)');
+            return;
+        }
+        
+        if (this.selectedPoints.size === 0) {
+            alert('Selezionare almeno un punto');
+            return;
+        }
+        
+        this.selectedPoints.forEach(index => {
+            if (index < this.splinePoints.length) {
+                this.splinePoints[index].velocity = velocity;
+            }
+        });
+        
+        this.updateSplineTable();
+        this.bulkVelocityInput.value = '';
+    }
+
+    removePoint(index) {
+        if (confirm('Rimuovere questo punto?')) {
+            this.splinePoints.splice(index, 1);
+            
+            // Update selected points after removal
+            const newSelectedPoints = new Set();
+            this.selectedPoints.forEach(selectedIndex => {
+                if (selectedIndex < index) {
+                    newSelectedPoints.add(selectedIndex);
+                } else if (selectedIndex > index) {
+                    newSelectedPoints.add(selectedIndex - 1);
+                }
+                // Skip the removed index
+            });
+            this.selectedPoints = newSelectedPoints;
+            
+            this.drawSpline();
+            this.updateSplineTable();
+        }
+    }
+
+    removeSelectedPoints() {
+        if (this.selectedPoints.size === 0) {
+            alert('Nessun punto selezionato');
+            return;
+        }
+        
+        if (confirm(`Rimuovere ${this.selectedPoints.size} punti selezionati?`)) {
+            // Convert to array and sort in descending order to avoid index shifting
+            const sortedIndices = Array.from(this.selectedPoints).sort((a, b) => b - a);
+            
+            sortedIndices.forEach(index => {
+                this.splinePoints.splice(index, 1);
+            });
+            
+            this.selectedPoints.clear();
+            this.lastSelectedIndex = null;
+            this.drawSpline();
+            this.updateSplineTable();
+        }
+    }
+
+    removeShape(index) {
+        if (confirm('Rimuovere questa geometria?')) {
+            this.shapes.splice(index, 1);
+            this.redrawShapes();
+            this.updateShapesTable();
+        }
+    }
+
+    focusPoint(index) {
+        // Highlight point on canvas (temporary visual feedback)
+        const point = this.splinePoints[index];
+        const screenPos = this.worldToScreen(point.x, point.y);
+        
+        this.splineCtx.save();
+        this.splineCtx.strokeStyle = '#ff0000';
+        this.splineCtx.lineWidth = 3;
+        this.splineCtx.beginPath();
+        this.splineCtx.arc(screenPos.x, screenPos.y, 8, 0, 2 * Math.PI);
+        this.splineCtx.stroke();
+        this.splineCtx.restore();
+        
+        setTimeout(() => this.drawSpline(), 1000);
+    }
+
+    focusShape(index) {
+        // Highlight shape on canvas (temporary visual feedback)
+        const shape = this.shapes[index];
+        const start = this.worldToScreen(shape.start.x, shape.start.y);
+        const end = this.worldToScreen(shape.end.x, shape.end.y);
+        
+        this.shapeCtx.save();
+        this.shapeCtx.strokeStyle = '#ff0000';
+        this.shapeCtx.lineWidth = 4;
+        this.shapeCtx.setLineDash([5, 5]);
+        this.shapeCtx.beginPath();
+        
+        if (shape.type === 'rectangle') {
+            const width = end.x - start.x;
+            const height = end.y - start.y;
+            this.shapeCtx.rect(start.x, start.y, width, height);
+        } else if (shape.type === 'circle') {
+            const radius = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
+            this.shapeCtx.arc(start.x, start.y, radius, 0, 2 * Math.PI);
+        }
+        
+        this.shapeCtx.stroke();
+        this.shapeCtx.restore();
+        
+        setTimeout(() => this.redrawShapes(), 1000);
+    }
+
     // Snap indicator
     drawSnapIndicator(worldPos) {
         if (!this.settings.enableSnap) return;
@@ -681,6 +1101,8 @@ class SplineGenerator {
         this.splinePoints = [];
         this.shapes = [];
         this.isDrawing = false;
+        this.updateSplineTable();
+        this.updateShapesTable();
     }
 
     // Settings functionality

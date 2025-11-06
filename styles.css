@@ -87,10 +87,14 @@ header h1 {
 main {
     flex: 1;
     display: flex;
-    justify-content: center;
-    align-items: center;
     padding: 20px;
     overflow: hidden;
+}
+
+.workspace {
+    display: flex;
+    width: 100%;
+    gap: 20px;
 }
 
 #canvasContainer {
@@ -102,6 +106,191 @@ main {
     overflow: visible;
     width: 1200px;
     height: 800px;
+    flex-shrink: 0;
+}
+
+/* Side Panel */
+.side-panel {
+    width: 400px;
+    background: white;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.panel-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 0;
+}
+
+.tab-container {
+    display: flex;
+}
+
+.tab-btn {
+    flex: 1;
+    background: transparent;
+    color: rgba(255,255,255,0.7);
+    border: none;
+    padding: 15px 10px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.tab-btn:hover {
+    color: rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.1);
+}
+
+.tab-btn.active {
+    color: white;
+    background: rgba(255,255,255,0.2);
+    border-bottom-color: white;
+}
+
+.panel-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.tab-content {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.tab-content.active {
+    display: flex;
+}
+
+.tab-toolbar {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    background: #f8f9fa;
+}
+
+.spline-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.spline-controls label {
+    font-weight: 500;
+    color: #555;
+}
+
+.spline-controls input {
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    width: 100px;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 13px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.btn-small:hover {
+    background: #5a67d8;
+}
+
+.spline-info, .shapes-info {
+    display: flex;
+    gap: 15px;
+    font-size: 13px;
+    color: #666;
+}
+
+.table-container {
+    flex: 1;
+    overflow: auto;
+    padding: 0;
+}
+
+.table-container table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.table-container th {
+    background: #f1f3f4;
+    padding: 10px 8px;
+    text-align: left;
+    font-weight: 600;
+    color: #444;
+    border-bottom: 2px solid #ddd;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.table-container td {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    vertical-align: middle;
+}
+
+.table-container tr:hover {
+    background: #f8f9fa;
+}
+
+.table-container tr.selected {
+    background: #e3f2fd;
+}
+
+.table-container input[type="checkbox"] {
+    margin: 0;
+}
+
+.table-container input[type="number"] {
+    width: 80px;
+    padding: 4px 6px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.table-container .btn-mini {
+    padding: 3px 6px;
+    font-size: 11px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    margin: 0 2px;
+}
+
+.table-container .btn-mini:hover {
+    background: #c82333;
+}
+
+.table-container .btn-mini.edit {
+    background: #28a745;
+}
+
+.table-container .btn-mini.edit:hover {
+    background: #218838;
 }
 
 #canvasContainer canvas {
@@ -307,6 +496,27 @@ main {
 }
 
 /* Responsive */
+@media (max-width: 1680px) {
+    .workspace {
+        flex-direction: column;
+    }
+    
+    .side-panel {
+        width: 100%;
+        height: 300px;
+    }
+    
+    #canvasContainer {
+        width: 100%;
+        height: 600px;
+    }
+    
+    #canvasContainer canvas {
+        width: 100%;
+        height: 100%;
+    }
+}
+
 @media (max-width: 768px) {
     .toolbar {
         flex-direction: column;
@@ -331,5 +541,13 @@ main {
     
     .setting-row input {
         flex: none;
+    }
+    
+    main {
+        padding: 10px;
+    }
+    
+    .workspace {
+        gap: 10px;
     }
 }

@@ -26,10 +26,83 @@
         </header>
 
         <main>
-            <div id="canvasContainer">
-                <canvas id="gridCanvas" width="1200" height="800"></canvas>
-                <canvas id="shapeCanvas" width="1200" height="800"></canvas>
-                <canvas id="splineCanvas" width="1200" height="800"></canvas>
+            <div class="workspace">
+                <div id="canvasContainer">
+                    <canvas id="gridCanvas" width="1200" height="800"></canvas>
+                    <canvas id="shapeCanvas" width="1200" height="800"></canvas>
+                    <canvas id="splineCanvas" width="1200" height="800"></canvas>
+                </div>
+                
+                <div id="sidePanel" class="side-panel">
+                    <div class="panel-header">
+                        <div class="tab-container">
+                            <button class="tab-btn active" data-tab="spline-tab">📏 Punti Spline</button>
+                            <button class="tab-btn" data-tab="shapes-tab">📐 Geometrie</button>
+                        </div>
+                    </div>
+                    
+                    <div class="panel-content">
+                        <!-- Tab Punti Spline -->
+                        <div id="spline-tab" class="tab-content active">
+                            <div class="tab-toolbar">
+                                <div class="spline-controls">
+                                    <label>Velocità selezionati:</label>
+                                    <input type="number" id="bulkVelocity" placeholder="mm/s" min="0" step="0.1" value="30">
+                                    <button id="applyBulkVelocity" class="btn btn-small">Applica</button>
+                                </div>
+                                <div class="spline-info">
+                                    <span id="pointCount">0 punti</span>
+                                    <span id="selectedCount">0 selezionati</span>
+                                </div>
+                            </div>
+                            
+                            <div class="table-container">
+                                <table id="splineTable">
+                                    <thead>
+                                        <tr>
+                                            <th><input type="checkbox" id="selectAllPoints"></th>
+                                            <th>ID</th>
+                                            <th>X (mm)</th>
+                                            <th>Y (mm)</th>
+                                            <th>Velocità (mm/s)</th>
+                                            <th>Azioni</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="splineTableBody">
+                                        <!-- Punti spline verranno inseriti qui -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Tab Geometrie -->
+                        <div id="shapes-tab" class="tab-content">
+                            <div class="tab-toolbar">
+                                <div class="shapes-info">
+                                    <span id="shapesCount">0 geometrie</span>
+                                </div>
+                            </div>
+                            
+                            <div class="table-container">
+                                <table id="shapesTable">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Tipo</th>
+                                            <th>Posizione X (mm)</th>
+                                            <th>Posizione Y (mm)</th>
+                                            <th>Dimensioni</th>
+                                            <th>Azioni</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="shapesTableBody">
+                                        <!-- Geometrie verranno inserite qui -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
 
