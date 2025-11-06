@@ -25,6 +25,7 @@ class SplineGenerator {
         this.animationStartTime = 0;
         this.animationRequestId = null;
         this.totalAnimationTime = 0;
+        this.pausedTime = 0;
         
         // Draw grid after everything is initialized
         setTimeout(() => {
@@ -67,6 +68,7 @@ class SplineGenerator {
         this.playBtn = document.getElementById('playBtn');
         this.pauseBtn = document.getElementById('pauseBtn');
         this.stopBtn = document.getElementById('stopBtn');
+        this.timeDisplay = document.getElementById('timeDisplay');
         
         // Side panel elements
         this.tabButtons = document.querySelectorAll('.tab-btn');
@@ -1571,6 +1573,22 @@ class SplineGenerator {
     }
     
     // Animation methods
+    formatTime(milliseconds) {
+        const totalSeconds = Math.floor(milliseconds / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const centiseconds = Math.floor((milliseconds % 1000) / 10);
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
+    }
+    
+    updateTimeDisplay(elapsedTime) {
+        if (this.timeDisplay) {
+            const current = this.formatTime(elapsedTime);
+            const total = this.formatTime(this.totalAnimationTime);
+            this.timeDisplay.textContent = `${current} / ${total}`;
+        }
+    }
+    
     calculateTotalAnimationTime() {
         if (this.splinePoints.length < 2) return 0;
         
@@ -1597,10 +1615,20 @@ class SplineGenerator {
         }
         
         this.isAnimating = true;
-        this.isPaused = false;
-        this.animationProgress = 0;
-        this.totalAnimationTime = this.calculateTotalAnimationTime();
-        this.animationStartTime = performance.now();
+        
+        if (!this.isPaused) {
+            // Starting fresh animation
+            this.animationProgress = 0;
+            this.totalAnimationTime = this.calculateTotalAnimationTime();
+            this.pausedTime = 0;
+            this.updateTimeDisplay(0);
+        } else {
+            // Resuming from pause
+            this.isPaused = false;
+        }
+        
+        // Set start time accounting for paused time
+        this.animationStartTime = performance.now() - this.pausedTime;
         
         // Update button visibility
         this.playBtn.style.display = 'none';
@@ -1612,6 +1640,9 @@ class SplineGenerator {
     pauseAnimation() {
         this.isPaused = true;
         this.isAnimating = false;
+        
+        // Save the elapsed time when pausing
+        this.pausedTime = performance.now() - this.animationStartTime;
         
         if (this.animationRequestId) {
             cancelAnimationFrame(this.animationRequestId);
@@ -1627,6 +1658,7 @@ class SplineGenerator {
         this.isAnimating = false;
         this.isPaused = false;
         this.animationProgress = 0;
+        this.pausedTime = 0;
         
         if (this.animationRequestId) {
             cancelAnimationFrame(this.animationRequestId);
@@ -1635,6 +1667,9 @@ class SplineGenerator {
         
         // Clear animation canvas
         this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        
+        // Reset time display
+        this.updateTimeDisplay(0);
         
         // Update button visibility
         this.playBtn.style.display = 'inline-block';
@@ -1646,6 +1681,9 @@ class SplineGenerator {
         
         const currentTime = performance.now();
         const elapsedTime = currentTime - this.animationStartTime;
+        
+        // Update time display
+        this.updateTimeDisplay(elapsedTime);
         
         // Clear animation canvas
         this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
