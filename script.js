@@ -614,16 +614,6 @@ class SplineGenerator {
                 this.shapeCtx.fill();
                 this.shapeCtx.stroke();
                 break;
-                
-            case 'triangle':
-                const centerX = (start.x + end.x) / 2;
-                this.shapeCtx.moveTo(centerX, start.y);
-                this.shapeCtx.lineTo(start.x, end.y);
-                this.shapeCtx.lineTo(end.x, end.y);
-                this.shapeCtx.closePath();
-                this.shapeCtx.fill();
-                this.shapeCtx.stroke();
-                break;
         }
     }
 
