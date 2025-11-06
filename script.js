@@ -30,6 +30,7 @@ class SplineGenerator {
         // Draw grid after everything is initialized
         setTimeout(() => {
             this.drawGrid();
+            this.updateTableHeaders();
             console.log('Grid drawn');
         }, 100);
     }
@@ -97,7 +98,9 @@ class SplineGenerator {
             samplingDistance: 2,
             splineSmoothing: 0.5,
             splineColor: '#ff0000',
-            shapeColor: '#0066cc'
+            shapeColor: '#0066cc',
+            xAxisLabel: 'X',
+            yAxisLabel: 'Y'
         };
         this.loadSettingsFromStorage();
         this.updateSettingsUI();
@@ -246,6 +249,32 @@ class SplineGenerator {
                     smoothingValue.textContent = e.target.value;
                 }
             });
+        }
+        
+        // Axis label validation
+        const xAxisSelect = document.getElementById('xAxisLabel');
+        const yAxisSelect = document.getElementById('yAxisLabel');
+        
+        if (xAxisSelect && yAxisSelect) {
+            const validateAxisLabels = () => {
+                const xValue = xAxisSelect.value;
+                const yValue = yAxisSelect.value;
+                
+                if (xValue === yValue) {
+                    // Reset to different values
+                    if (xValue === 'X') {
+                        yAxisSelect.value = 'Y';
+                    } else if (xValue === 'Y') {
+                        yAxisSelect.value = 'Z';
+                    } else {
+                        yAxisSelect.value = 'X';
+                    }
+                    alert('Le etichette degli assi devono essere diverse!');
+                }
+            };
+            
+            xAxisSelect.addEventListener('change', validateAxisLabels);
+            yAxisSelect.addEventListener('change', validateAxisLabels);
         }
         
         // Modal background click
@@ -449,8 +478,67 @@ class SplineGenerator {
             this.gridCtx.lineTo(zeroX, zeroY + 5);
             this.gridCtx.stroke();
         }
+        
+        // Draw axis labels
+        this.drawAxisLabels(zeroX, zeroY);
+    }
+    
+    drawAxisLabels(zeroX, zeroY) {
+        this.gridCtx.fillStyle = '#000000';
+        this.gridCtx.font = 'bold 16px Arial';
+        
+        // X axis label (horizontal axis) - position at right end
+        this.gridCtx.textAlign = 'center';
+        this.gridCtx.textBaseline = 'middle';
+        
+        let xLabelX = this.canvasWidth - 20;
+        let xLabelY = zeroY;
+        
+        // If zero line is not visible, place at bottom
+        if (!(0 >= this.settings.minY && 0 <= this.settings.maxY)) {
+            xLabelY = this.canvasHeight - 20;
+        }
+        
+        this.gridCtx.fillText(this.settings.xAxisLabel, xLabelX, xLabelY);
+        
+        // Y axis label (vertical axis) - position at top end
+        this.gridCtx.textAlign = 'center';
+        this.gridCtx.textBaseline = 'middle';
+        
+        let yLabelX = zeroX;
+        let yLabelY = 20;
+        
+        // If zero line is not visible, place at left
+        if (!(0 >= this.settings.minX && 0 <= this.settings.maxX)) {
+            yLabelX = 20;
+        }
+        
+        this.gridCtx.fillText(this.settings.yAxisLabel, yLabelX, yLabelY);
+    }
+    
+    updateTableHeaders() {
+        // Update spline table headers
+        const splineTable = document.getElementById('splineTable');
+        if (splineTable) {
+            const headers = splineTable.querySelectorAll('thead th');
+            if (headers.length >= 4) {
+                headers[1].textContent = `Posizione ${this.settings.xAxisLabel} (mm)`;
+                headers[2].textContent = `Posizione ${this.settings.yAxisLabel} (mm)`;
+            }
+        }
+        
+        // Update shapes table headers
+        const shapesTable = document.getElementById('shapesTable');
+        if (shapesTable) {
+            const headers = shapesTable.querySelectorAll('thead th');
+            if (headers.length >= 5) {
+                headers[2].textContent = `Posizione ${this.settings.xAxisLabel} (mm)`;
+                headers[3].textContent = `Posizione ${this.settings.yAxisLabel} (mm)`;
+            }
+        }
     }
 
+    // Coordinate conversion
     // Coordinate conversion
     screenToWorld(screenX, screenY) {
         const rect = this.splineCanvas.getBoundingClientRect();
@@ -1411,9 +1499,18 @@ class SplineGenerator {
         this.settings.splineSmoothing = parseFloat(document.getElementById('splineSmoothing').value);
         this.settings.splineColor = document.getElementById('splineColor').value;
         this.settings.shapeColor = document.getElementById('shapeColor').value;
+        this.settings.xAxisLabel = document.getElementById('xAxisLabel').value;
+        this.settings.yAxisLabel = document.getElementById('yAxisLabel').value;
+        
+        // Validate that X and Y axis labels are different
+        if (this.settings.xAxisLabel === this.settings.yAxisLabel) {
+            alert('Le etichette degli assi devono essere diverse!');
+            return;
+        }
         
         this.saveSettingsToStorage();
         this.drawGrid();
+        this.updateTableHeaders();
         this.redrawShapes();
         this.drawSpline();
         this.closeSettings();
@@ -1432,11 +1529,14 @@ class SplineGenerator {
             samplingDistance: 2,
             splineSmoothing: 0.5,
             splineColor: '#ff0000',
-            shapeColor: '#0066cc'
+            shapeColor: '#0066cc',
+            xAxisLabel: 'X',
+            yAxisLabel: 'Y'
         };
         this.updateSettingsUI();
         this.saveSettingsToStorage();
         this.drawGrid();
+        this.updateTableHeaders();
         this.redrawShapes();
         this.drawSpline();
     }
@@ -1455,7 +1555,9 @@ class SplineGenerator {
             'samplingDistance': this.settings.samplingDistance,
             'splineSmoothing': this.settings.splineSmoothing,
             'splineColor': this.settings.splineColor,
-            'shapeColor': this.settings.shapeColor
+            'shapeColor': this.settings.shapeColor,
+            'xAxisLabel': this.settings.xAxisLabel,
+            'yAxisLabel': this.settings.yAxisLabel
         };
         
         for (const [id, value] of Object.entries(elements)) {
