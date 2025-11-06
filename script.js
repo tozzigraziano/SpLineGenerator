@@ -228,11 +228,15 @@ class SplineGenerator {
         const scaleX = this.canvasWidth / totalRangeX;
         const scaleY = this.canvasHeight / totalRangeY;
         
-        console.log(`Scale: ${scaleX}px/mm (X), ${scaleY}px/mm (Y)`);
+        // Use the smaller scale to ensure 1:1 aspect ratio (square pixels)
+        const scale = Math.min(scaleX, scaleY);
         
-        // Calculate position of X=0 and Y=0 axes
-        const zeroX = (0 - this.settings.minX) * scaleX;
-        const zeroY = this.canvasHeight - (0 - this.settings.minY) * scaleY;
+        console.log(`Original scales: ${scaleX.toFixed(2)}px/mm (X), ${scaleY.toFixed(2)}px/mm (Y)`);
+        console.log(`Uniform scale: ${scale.toFixed(2)}px/mm`);
+        
+        // Calculate position of X=0 and Y=0 axes with uniform scale
+        const zeroX = (0 - this.settings.minX) * scale;
+        const zeroY = this.canvasHeight - (0 - this.settings.minY) * scale;
         
         // Secondary grid lines (fine grid)
         this.gridCtx.strokeStyle = '#e8e8e8';
@@ -241,14 +245,14 @@ class SplineGenerator {
         
         // Vertical lines
         for (let x = this.settings.minX; x <= this.settings.maxX; x += this.settings.gridSize) {
-            const canvasX = (x - this.settings.minX) * scaleX;
+            const canvasX = (x - this.settings.minX) * scale;
             this.gridCtx.moveTo(canvasX, 0);
             this.gridCtx.lineTo(canvasX, this.canvasHeight);
         }
         
         // Horizontal lines  
         for (let y = this.settings.minY; y <= this.settings.maxY; y += this.settings.gridSize) {
-            const canvasY = this.canvasHeight - (y - this.settings.minY) * scaleY;
+            const canvasY = this.canvasHeight - (y - this.settings.minY) * scale;
             this.gridCtx.moveTo(0, canvasY);
             this.gridCtx.lineTo(this.canvasWidth, canvasY);
         }
@@ -264,7 +268,7 @@ class SplineGenerator {
         // Major vertical lines
         for (let x = this.settings.minX; x <= this.settings.maxX; x += majorStep) {
             if (x % majorStep === 0) {
-                const canvasX = (x - this.settings.minX) * scaleX;
+                const canvasX = (x - this.settings.minX) * scale;
                 this.gridCtx.moveTo(canvasX, 0);
                 this.gridCtx.lineTo(canvasX, this.canvasHeight);
             }
@@ -273,7 +277,7 @@ class SplineGenerator {
         // Major horizontal lines
         for (let y = this.settings.minY; y <= this.settings.maxY; y += majorStep) {
             if (y % majorStep === 0) {
-                const canvasY = this.canvasHeight - (y - this.settings.minY) * scaleY;
+                const canvasY = this.canvasHeight - (y - this.settings.minY) * scale;
                 this.gridCtx.moveTo(0, canvasY);
                 this.gridCtx.lineTo(this.canvasWidth, canvasY);
             }
@@ -301,7 +305,7 @@ class SplineGenerator {
         this.gridCtx.stroke();
         
         // Draw labels for both minor and major grid lines
-        this.drawGridLabels(scaleX, scaleY, zeroX, zeroY);
+        this.drawGridLabels(scale, scale, zeroX, zeroY);
         
         console.log('Grid drawing completed');
     }
@@ -406,8 +410,11 @@ class SplineGenerator {
         const scaleX = this.canvasWidth / totalRangeX;
         const scaleY = this.canvasHeight / totalRangeY;
         
-        const worldX = this.settings.minX + (canvasX / scaleX);
-        const worldY = this.settings.maxY - (canvasY / scaleY);
+        // Use uniform scale to maintain 1:1 aspect ratio
+        const scale = Math.min(scaleX, scaleY);
+        
+        const worldX = this.settings.minX + (canvasX / scale);
+        const worldY = this.settings.maxY - (canvasY / scale);
         
         return { x: worldX, y: worldY };
     }
@@ -418,8 +425,11 @@ class SplineGenerator {
         const scaleX = this.canvasWidth / totalRangeX;
         const scaleY = this.canvasHeight / totalRangeY;
         
-        const canvasX = (worldX - this.settings.minX) * scaleX;
-        const canvasY = (this.settings.maxY - worldY) * scaleY;
+        // Use uniform scale to maintain 1:1 aspect ratio
+        const scale = Math.min(scaleX, scaleY);
+        
+        const canvasX = (worldX - this.settings.minX) * scale;
+        const canvasY = (this.settings.maxY - worldY) * scale;
         
         return { x: canvasX, y: canvasY };
     }
@@ -903,13 +913,13 @@ class SplineGenerator {
         const height = Math.abs(shape.end.y - shape.start.y);
         
         if (shape.type === 'rectangle') {
-            return `<input type="number" class="shape-dimension-input" data-index="${index}" data-dimension="width" value="${width.toFixed(1)}" min="0.1" step="0.1" style="width:50px"> × 
-                    <input type="number" class="shape-dimension-input" data-index="${index}" data-dimension="height" value="${height.toFixed(1)}" min="0.1" step="0.1" style="width:50px"> mm`;
+            return `<input type="number" class="shape-dimension-input" data-index="${index}" data-dimension="width" value="${width.toFixed(1)}" min="0.1" step="0.1" style="width:45px"> × 
+                    <input type="number" class="shape-dimension-input" data-index="${index}" data-dimension="height" value="${height.toFixed(1)}" min="0.1" step="0.1" style="width:45px"> mm`;
         } else if (shape.type === 'circle') {
             // Per i cerchi, il raggio è la distanza tra start e end
             const radius = Math.sqrt(width * width + height * height);
             const diameter = radius * 2;
-            return `⌀ <input type="number" class="shape-dimension-input" data-index="${index}" data-dimension="diameter" value="${diameter.toFixed(1)}" min="0.1" step="0.1" style="width:60px"> mm`;
+            return `⌀ <input type="number" class="shape-dimension-input" data-index="${index}" data-dimension="diameter" value="${diameter.toFixed(1)}" min="0.1" step="0.1" style="width:55px"> mm`;
         }
         return '';
     }

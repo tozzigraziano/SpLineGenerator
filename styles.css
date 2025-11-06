@@ -111,7 +111,7 @@ main {
 
 /* Side Panel */
 .side-panel {
-    width: 400px;
+    width: 450px;
     background: white;
     border: 2px solid #ddd;
     border-radius: 10px;
@@ -313,8 +313,9 @@ main {
     background-color: #f8d7da;
     border: 1px solid #ddd;
     border-radius: 3px;
-    padding: 2px 4px;
+    padding: 2px 3px;
     font-size: 11px;
+    min-width: 45px;
 }
 
 .table-container input.shape-dimension-input:focus {
