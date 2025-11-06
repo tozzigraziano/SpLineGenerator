@@ -113,17 +113,28 @@ class SplineGenerator {
     initializeCanvases() {
         console.log('Initializing canvases...');
         
-        if (!this.gridCanvas || !this.shapeCanvas || !this.splineCanvas) {
+        if (!this.gridCanvas || !this.shapeCanvas || !this.splineCanvas || !this.animationCanvas) {
             console.error('Cannot initialize canvases - elements not found');
+            console.log('gridCanvas:', this.gridCanvas);
+            console.log('shapeCanvas:', this.shapeCanvas);
+            console.log('splineCanvas:', this.splineCanvas);
+            console.log('animationCanvas:', this.animationCanvas);
             return;
         }
         
-        // Set canvas styles
-        [this.gridCanvas, this.shapeCanvas, this.splineCanvas].forEach(canvas => {
-            canvas.style.display = 'block';
-            canvas.style.position = 'absolute';
-            canvas.style.top = '0';
-            canvas.style.left = '0';
+        [this.gridCanvas, this.shapeCanvas, this.splineCanvas, this.animationCanvas].forEach(canvas => {
+            if (canvas) {
+                canvas.style.display = 'block';
+                canvas.style.position = 'absolute';
+                canvas.style.top = '0';
+                canvas.style.left = '0';
+                
+                // Disable pointer events on animation canvas
+                if (canvas === this.animationCanvas) {
+                    canvas.style.pointerEvents = 'none';
+                    console.log('Disabled pointer events on animation canvas');
+                }
+            }
         });
         
         this.gridCtx = this.gridCanvas.getContext('2d');
@@ -144,6 +155,8 @@ class SplineGenerator {
         this.centerY = this.canvasHeight / 2;
         
         console.log('Canvases initialized successfully');
+        console.log('Final splineCanvas check:', this.splineCanvas);
+        console.log('SplineCanvas ID:', this.splineCanvas?.id);
     }
 
     initializeEventListeners() {
@@ -215,10 +228,32 @@ class SplineGenerator {
         
         // Canvas events
         if (this.splineCanvas) {
-            this.splineCanvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+            console.log('Adding mouse events to canvas');
+            console.log('Canvas element:', this.splineCanvas);
+            console.log('Canvas getBoundingClientRect:', this.splineCanvas.getBoundingClientRect());
+            
+            this.splineCanvas.addEventListener('mousedown', (e) => {
+                console.log('Raw mousedown event received');
+                console.log('Event clientX:', e.clientX, 'clientY:', e.clientY);
+                
+                try {
+                    const worldPos = this.getMousePosition(e);
+                    console.log('World position calculated:', worldPos);
+                    this.handleMouseDown(e);
+                } catch (error) {
+                    console.error('Error in mousedown handler:', error);
+                }
+            });
             this.splineCanvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
             this.splineCanvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
             this.splineCanvas.addEventListener('mouseleave', (e) => this.handleMouseUp(e));
+            
+            // Test click event
+            this.splineCanvas.addEventListener('click', (e) => {
+                console.log('Click event received on canvas!', e);
+            });
+        } else {
+            console.error('splineCanvas not found!');
         }
         
         // Tab events
@@ -296,6 +331,13 @@ class SplineGenerator {
         }
         
         console.log('Event listeners initialized');
+        
+        // Test global click events
+        document.addEventListener('click', (e) => {
+            console.log('Global click received on:', e.target);
+            console.log('Target ID:', e.target.id);
+            console.log('Target class:', e.target.className);
+        });
     }
 
     // Grid drawing
@@ -548,7 +590,6 @@ class SplineGenerator {
     }
 
     // Coordinate conversion
-    // Coordinate conversion
     screenToWorld(screenX, screenY) {
         const rect = this.splineCanvas.getBoundingClientRect();
         const canvasX = screenX - rect.left;
@@ -607,12 +648,18 @@ class SplineGenerator {
 
     // Mouse event handlers
     handleMouseDown(e) {
+        console.log('Mouse down event triggered', e);
+        console.log('Current tool:', this.currentTool);
+        
         this.isMouseDown = true;
         const worldPos = this.getMousePosition(e);
+        console.log('World position:', worldPos);
         
         if (this.currentTool === 'spline') {
+            console.log('Starting spline');
             this.startSpline(worldPos);
         } else {
+            console.log('Starting shape:', this.currentTool);
             this.startShape(worldPos);
         }
     }
@@ -660,14 +707,19 @@ class SplineGenerator {
 
     // Spline functionality
     startSpline(worldPos) {
+        console.log('startSpline called with:', worldPos);
+        console.log('isDrawing:', this.isDrawing);
+        
         if (!this.isDrawing) {
             this.splinePoints = [worldPos];
             this.isDrawing = true;
             this.lastSampleTime = Date.now();
+            console.log('Started new spline');
         } else {
             // Single click adds point
             this.splinePoints.push(worldPos);
             this.drawSpline();
+            console.log('Added point to spline, total points:', this.splinePoints.length);
         }
         this.updateSplineTable();
     }
@@ -1401,9 +1453,16 @@ class SplineGenerator {
     }
 
     saveProject() {
+        // Get project name from input
+        const projectNameInput = document.getElementById('projectName');
+        const projectName = projectNameInput && projectNameInput.value.trim() 
+            ? projectNameInput.value.trim() 
+            : '';
+        
         const projectData = {
             version: '1.0',
             timestamp: new Date().toISOString(),
+            projectName: projectName,
             settings: this.settings,
             splinePoints: this.splinePoints,
             shapes: this.shapes
@@ -1412,15 +1471,14 @@ class SplineGenerator {
         const dataStr = JSON.stringify(projectData, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
         
-        // Ottieni il nome del progetto dall'input o usa il timestamp come fallback
-        const projectNameInput = document.getElementById('projectName');
+        // Determine filename
         let fileName = 'spline-project';
         
-        if (projectNameInput && projectNameInput.value.trim()) {
-            // Usa il nome del progetto specificato, rimuovendo caratteri non validi
-            fileName = projectNameInput.value.trim().replace(/[^a-zA-Z0-9_\-]/g, '-');
+        if (projectName) {
+            // Use project name specified, removing invalid characters
+            fileName = projectName.replace(/[^a-zA-Z0-9_\-]/g, '-');
         } else {
-            // Usa il timestamp come fallback
+            // Use timestamp as fallback
             fileName = `spline-project-${new Date().toISOString().slice(0,10)}`;
         }
         
@@ -1459,15 +1517,32 @@ class SplineGenerator {
                 
                 // Load data from project
                 if (projectData.settings) {
-                    this.settings = { ...this.settings, ...projectData.settings };
-                    this.saveSettings(); // Update localStorage
+                    // Merge settings ensuring all new properties are included
+                    this.settings = { 
+                        ...this.settings, 
+                        ...projectData.settings,
+                        // Ensure new axis label settings have defaults if not present
+                        xAxisLabel: projectData.settings.xAxisLabel || 'X',
+                        yAxisLabel: projectData.settings.yAxisLabel || 'Y'
+                    };
+                    this.updateSettingsUI();
+                    this.saveSettingsToStorage();
+                }
+                
+                // Load project name if available
+                if (projectData.projectName) {
+                    const projectNameInput = document.getElementById('projectName');
+                    if (projectNameInput) {
+                        projectNameInput.value = projectData.projectName;
+                    }
                 }
                 
                 this.splinePoints = projectData.splinePoints || [];
                 this.shapes = projectData.shapes || [];
                 
-                // Redraw everything
+                // Redraw everything with updated settings
                 this.drawGrid();
+                this.updateTableHeaders();
                 this.drawSpline();
                 this.redrawShapes();
                 this.updateSplineTable();

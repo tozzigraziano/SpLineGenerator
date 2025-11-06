@@ -512,6 +512,7 @@ main {
 #animationCanvas {
     z-index: 4;
     background: transparent;
+    pointer-events: none;
 }
 
 /* Modal */
