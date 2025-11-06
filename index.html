@@ -18,6 +18,15 @@
                     <button id="loadBtn" class="btn">📁 Carica Progetto</button>
                     <input type="file" id="fileInput" accept=".json" style="display: none;">
                 </div>
+                <div class="export-group">
+                    <select id="robotType" class="robot-select">
+                        <option value="kuka">KUKA KRL</option>
+                        <option value="fanuc" disabled>FANUC (futuro)</option>
+                        <option value="abb" disabled>ABB RAPID (futuro)</option>
+                        <option value="motoman" disabled>MOTOMAN INFORM (futuro)</option>
+                    </select>
+                    <button id="exportBtn" class="btn btn-export">🤖 Esporta Robot</button>
+                </div>
                 <div class="clear-group">
                     <button id="clearSplineBtn" class="btn btn-warning">🗑️ Pulisci Spline</button>
                     <button id="clearShapesBtn" class="btn btn-warning">🗑️ Pulisci Geometrie</button>

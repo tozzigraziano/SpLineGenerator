@@ -71,6 +71,10 @@ class SplineGenerator {
         this.stopBtn = document.getElementById('stopBtn');
         this.timeDisplay = document.getElementById('timeDisplay');
         
+        // Export elements
+        this.robotType = document.getElementById('robotType');
+        this.exportBtn = document.getElementById('exportBtn');
+        
         // Side panel elements
         this.tabButtons = document.querySelectorAll('.tab-btn');
         this.splineTableBody = document.getElementById('splineTableBody');
@@ -202,6 +206,11 @@ class SplineGenerator {
         
         if (this.stopBtn) {
             this.stopBtn.addEventListener('click', () => this.stopAnimation());
+        }
+        
+        // Export button
+        if (this.exportBtn) {
+            this.exportBtn.addEventListener('click', () => this.exportRobotCode());
         }
         
         // Canvas events
@@ -1915,6 +1924,135 @@ class SplineGenerator {
         this.animationCtx.beginPath();
         this.animationCtx.arc(screenPos.x, screenPos.y, 5, 0, 2 * Math.PI);
         this.animationCtx.fill();
+    }
+    
+    // Robot code export methods
+    exportRobotCode() {
+        if (this.splinePoints.length < 2) {
+            alert('Aggiungi almeno 2 punti alla spline per esportare!');
+            return;
+        }
+        
+        const robotType = this.robotType ? this.robotType.value : 'kuka';
+        
+        switch (robotType) {
+            case 'kuka':
+                this.exportKukaCode();
+                break;
+            case 'fanuc':
+                alert('Esportazione FANUC non ancora implementata');
+                break;
+            case 'abb':
+                alert('Esportazione ABB non ancora implementata');
+                break;
+            case 'motoman':
+                alert('Esportazione MOTOMAN non ancora implementata');
+                break;
+            default:
+                alert('Tipo di robot non supportato');
+        }
+    }
+    
+    exportKukaCode() {
+        const projectNameInput = document.getElementById('projectName');
+        let projectName = 'Progetto1';
+        
+        if (projectNameInput && projectNameInput.value.trim()) {
+            projectName = projectNameInput.value.trim().replace(/[^a-zA-Z0-9_]/g, '_');
+        }
+        
+        // Generate .dat file
+        const datContent = this.generateKukaDatFile(projectName);
+        this.downloadFile(datContent, `${projectName}.dat`, 'text/plain');
+        
+        // Generate .src file
+        const srcContent = this.generateKukaSrcFile(projectName);
+        this.downloadFile(srcContent, `${projectName}.src`, 'text/plain');
+        
+        console.log('KUKA files exported:', `${projectName}.dat`, `${projectName}.src`);
+    }
+    
+    generateKukaDatFile(projectName) {
+        const numPoints = this.splinePoints.length;
+        
+        let content = `&ACCESS RVO
+&REL 35
+&PARAM DISKPATH = KRC:\\R1\\Program\\Support Programs
+DEFDAT  ${projectName} PUBLIC
+
+; positions from SpLine Generator
+DECL FRAME pSpl[${numPoints}]
+`;
+        
+        // Add FRAME positions
+        for (let i = 0; i < this.splinePoints.length; i++) {
+            const point = this.splinePoints[i];
+            content += `pSpl[${i + 1}]={X ${point.x.toFixed(1)},Y ${point.y.toFixed(1)},Z 0.0,A 0.0,B 0.0,C 0.0}\n`;
+        }
+        
+        content += `
+; calculated points
+DECL E6POS pMove[${numPoints}]
+`;
+        
+        // Add E6POS positions
+        for (let i = 0; i < this.splinePoints.length; i++) {
+            const point = this.splinePoints[i];
+            content += `pMove[${i + 1}]={X ${point.x.toFixed(1)},Y ${point.y.toFixed(1)},Z 0.0,A 0.0,B 0.0,C 0.0,S 0,T 0,E1 0.0,E2 0.0,E3 0.0,E4 0.0,E5 0.0,E6 0.0}\n`;
+        }
+        
+        content += 'ENDDAT\n';
+        
+        return content;
+    }
+    
+    generateKukaSrcFile(projectName) {
+        const numPoints = this.splinePoints.length;
+        
+        let content = `DEF ${projectName}(lp0: IN, lTool: IN, lBase: IN)
+    E6POS lp0
+    FRAME lTool, lBase
+    INT liIdx
+    
+    ; Calculate positions relative to base
+    FOR liIdx = 1 TO ${numPoints}
+        pMove[liIdx] = pToolOffset(lp0, pSpl[liIdx].X, pSpl[liIdx].Y, pSpl[liIdx].Z, 0, 0, 0)
+    ENDFOR
+    
+    $TOOL=lTool
+    $BASE=lBase
+    
+    SPLINE
+`;
+        
+        // Add spline points
+        for (let i = 0; i < this.splinePoints.length; i++) {
+            const point = this.splinePoints[i];
+            const velocity = (point.velocity || 30) / 1000; // Convert mm/s to m/s
+            
+            if (i === 0) {
+                content += `        SPL pMove[${i + 1}] WITH $ORI_TYPE = #CONSTANT, $VEL = {CP ${velocity.toFixed(3)},ORI1 45.0000,ORI2 45.0000}\n`;
+            } else {
+                content += `        SPL pMove[${i + 1}] WITH $VEL = {CP ${velocity.toFixed(3)},ORI1 45.0000,ORI2 45.0000}\n`;
+            }
+        }
+        
+        content += `    ENDSPLINE
+END\n`;
+        
+        return content;
+    }
+    
+    downloadFile(content, fileName, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 }
 
