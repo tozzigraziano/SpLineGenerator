@@ -1,0 +1,17 @@
+DEF {{PROJECT_NAME}}(lp0: IN, lTool: IN, lBase: IN)
+    E6POS lp0
+    FRAME lTool, lBase
+    INT liIdx
+    
+    ; Calculate positions relative to base
+    FOR liIdx = 1 TO {{NUM_POINTS}}
+        pMove[liIdx] = pToolOffset(lp0, pSpl[liIdx].X, pSpl[liIdx].Y, pSpl[liIdx].Z, 0, 0, 0)
+    ENDFOR
+    
+    $TOOL=lTool
+    $BASE=lBase
+    
+    SPLINE
+{{SPLINE_POINTS}}
+    ENDSPLINE
+END

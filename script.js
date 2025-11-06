@@ -232,18 +232,7 @@ class SplineGenerator {
             console.log('Canvas element:', this.splineCanvas);
             console.log('Canvas getBoundingClientRect:', this.splineCanvas.getBoundingClientRect());
             
-            this.splineCanvas.addEventListener('mousedown', (e) => {
-                console.log('Raw mousedown event received');
-                console.log('Event clientX:', e.clientX, 'clientY:', e.clientY);
-                
-                try {
-                    const worldPos = this.getMousePosition(e);
-                    console.log('World position calculated:', worldPos);
-                    this.handleMouseDown(e);
-                } catch (error) {
-                    console.error('Error in mousedown handler:', error);
-                }
-            });
+            this.splineCanvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
             this.splineCanvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
             this.splineCanvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
             this.splineCanvas.addEventListener('mouseleave', (e) => this.handleMouseUp(e));
@@ -331,13 +320,6 @@ class SplineGenerator {
         }
         
         console.log('Event listeners initialized');
-        
-        // Test global click events
-        document.addEventListener('click', (e) => {
-            console.log('Global click received on:', e.target);
-            console.log('Target ID:', e.target.id);
-            console.log('Target class:', e.target.className);
-        });
     }
 
     // Grid drawing
@@ -648,18 +630,12 @@ class SplineGenerator {
 
     // Mouse event handlers
     handleMouseDown(e) {
-        console.log('Mouse down event triggered', e);
-        console.log('Current tool:', this.currentTool);
-        
         this.isMouseDown = true;
         const worldPos = this.getMousePosition(e);
-        console.log('World position:', worldPos);
         
         if (this.currentTool === 'spline') {
-            console.log('Starting spline');
             this.startSpline(worldPos);
         } else {
-            console.log('Starting shape:', this.currentTool);
             this.startShape(worldPos);
         }
     }
@@ -707,19 +683,14 @@ class SplineGenerator {
 
     // Spline functionality
     startSpline(worldPos) {
-        console.log('startSpline called with:', worldPos);
-        console.log('isDrawing:', this.isDrawing);
-        
         if (!this.isDrawing) {
             this.splinePoints = [worldPos];
             this.isDrawing = true;
             this.lastSampleTime = Date.now();
-            console.log('Started new spline');
         } else {
             // Single click adds point
             this.splinePoints.push(worldPos);
             this.drawSpline();
-            console.log('Added point to spline, total points:', this.splinePoints.length);
         }
         this.updateSplineTable();
     }
@@ -2036,15 +2007,138 @@ class SplineGenerator {
             projectName = projectNameInput.value.trim().replace(/[^a-zA-Z0-9_]/g, '_');
         }
         
-        // Generate .dat file
-        const datContent = this.generateKukaDatFile(projectName);
-        this.downloadFile(datContent, `${projectName}.dat`, 'text/plain');
+        // Try to load templates, fallback to default if not available
+        this.loadKukaTemplates().then(templates => {
+            // Generate .dat file
+            const datContent = this.generateKukaDatFromTemplate(projectName, templates.dat);
+            this.downloadFile(datContent, `${projectName}.dat`, 'text/plain');
+            
+            // Generate .src file
+            const srcContent = this.generateKukaSrcFromTemplate(projectName, templates.src);
+            this.downloadFile(srcContent, `${projectName}.src`, 'text/plain');
+            
+            console.log('KUKA files exported:', `${projectName}.dat`, `${projectName}.src`);
+        }).catch(error => {
+            console.log('Using embedded templates (templates folder not accessible)');
+            // Use embedded templates
+            const templates = this.getEmbeddedKukaTemplates();
+            
+            const datContent = this.generateKukaDatFromTemplate(projectName, templates.dat);
+            this.downloadFile(datContent, `${projectName}.dat`, 'text/plain');
+            
+            const srcContent = this.generateKukaSrcFromTemplate(projectName, templates.src);
+            this.downloadFile(srcContent, `${projectName}.src`, 'text/plain');
+            
+            console.log('KUKA files exported using embedded templates');
+        });
+    }
+    
+    getEmbeddedKukaTemplates() {
+        return {
+            dat: `&ACCESS RVO
+&REL 35
+&PARAM DISKPATH = KRC:\\R1\\Program\\Support Programs
+DEFDAT  {{PROJECT_NAME}} PUBLIC
+
+; positions from SpLine Generator
+DECL FRAME pSpl[{{NUM_POINTS}}]
+{{FRAME_POSITIONS}}
+
+; calculated points
+DECL E6POS pMove[{{NUM_POINTS}}]
+{{MOVE_POSITIONS}}
+ENDDAT`,
+            src: `DEF {{PROJECT_NAME}}(lp0: IN, lTool: IN, lBase: IN)
+    E6POS lp0
+    FRAME lTool, lBase
+    INT liIdx
+    
+    ; Calculate positions relative to base
+    FOR liIdx = 1 TO {{NUM_POINTS}}
+        pMove[liIdx] = pToolOffset(lp0, pSpl[liIdx].X, pSpl[liIdx].Y, pSpl[liIdx].Z, 0, 0, 0)
+    ENDFOR
+    
+    $TOOL=lTool
+    $BASE=lBase
+    
+    SPLINE
+{{SPLINE_POINTS}}
+    ENDSPLINE
+END`
+        };
+    }
+    
+    async loadKukaTemplates() {
+        try {
+            // Check if we're running from a web server
+            if (window.location.protocol === 'file:') {
+                throw new Error('File protocol detected, using embedded templates');
+            }
+            
+            const [datResponse, srcResponse] = await Promise.all([
+                fetch('./templates/kuka_template.dat'),
+                fetch('./templates/kuka_template.src')
+            ]);
+            
+            if (!datResponse.ok || !srcResponse.ok) {
+                throw new Error('Template files not found');
+            }
+            
+            const dat = await datResponse.text();
+            const src = await srcResponse.text();
+            
+            console.log('Templates loaded from files');
+            return { dat, src };
+        } catch (error) {
+            throw new Error('Failed to load template files: ' + error.message);
+        }
+    }
+    
+    generateKukaDatFromTemplate(projectName, template) {
+        const numPoints = this.splinePoints.length;
         
-        // Generate .src file
-        const srcContent = this.generateKukaSrcFile(projectName);
-        this.downloadFile(srcContent, `${projectName}.src`, 'text/plain');
+        // Generate FRAME positions
+        let framePositions = '';
+        for (let i = 0; i < this.splinePoints.length; i++) {
+            const point = this.splinePoints[i];
+            framePositions += `pSpl[${i + 1}]={X ${point.x.toFixed(1)},Y ${point.y.toFixed(1)},Z 0.0,A 0.0,B 0.0,C 0.0}\n`;
+        }
         
-        console.log('KUKA files exported:', `${projectName}.dat`, `${projectName}.src`);
+        // Generate MOVE positions (all zeros)
+        let movePositions = '';
+        for (let i = 0; i < this.splinePoints.length; i++) {
+            movePositions += `pMove[${i + 1}]={X 0.0,Y 0.0,Z 0.0,A 0.0,B 0.0,C 0.0,S 0,T 0,E1 0.0,E2 0.0,E3 0.0,E4 0.0,E5 0.0,E6 0.0}\n`;
+        }
+        
+        // Replace template variables
+        return template
+            .replace(/\{\{PROJECT_NAME\}\}/g, projectName)
+            .replace(/\{\{NUM_POINTS\}\}/g, numPoints.toString())
+            .replace(/\{\{FRAME_POSITIONS\}\}/g, framePositions.trim())
+            .replace(/\{\{MOVE_POSITIONS\}\}/g, movePositions.trim());
+    }
+    
+    generateKukaSrcFromTemplate(projectName, template) {
+        const numPoints = this.splinePoints.length;
+        
+        // Generate spline points
+        let splinePoints = '';
+        for (let i = 0; i < this.splinePoints.length; i++) {
+            const point = this.splinePoints[i];
+            const velocity = (point.velocity || 30) / 1000; // Convert mm/s to m/s
+            
+            if (i === 0) {
+                splinePoints += `        SPL pMove[${i + 1}] WITH $ORI_TYPE = #CONSTANT, $VEL = {CP ${velocity.toFixed(3)},ORI1 45.0000,ORI2 45.0000}\n`;
+            } else {
+                splinePoints += `        SPL pMove[${i + 1}] WITH $VEL = {CP ${velocity.toFixed(3)},ORI1 45.0000,ORI2 45.0000}\n`;
+            }
+        }
+        
+        // Replace template variables
+        return template
+            .replace(/\{\{PROJECT_NAME\}\}/g, projectName)
+            .replace(/\{\{NUM_POINTS\}\}/g, numPoints.toString())
+            .replace(/\{\{SPLINE_POINTS\}\}/g, splinePoints.trim());
     }
     
     generateKukaDatFile(projectName) {
@@ -2070,10 +2164,9 @@ DECL FRAME pSpl[${numPoints}]
 DECL E6POS pMove[${numPoints}]
 `;
         
-        // Add E6POS positions
+        // Add E6POS positions with default values (all zeros)
         for (let i = 0; i < this.splinePoints.length; i++) {
-            const point = this.splinePoints[i];
-            content += `pMove[${i + 1}]={X ${point.x.toFixed(1)},Y ${point.y.toFixed(1)},Z 0.0,A 0.0,B 0.0,C 0.0,S 0,T 0,E1 0.0,E2 0.0,E3 0.0,E4 0.0,E5 0.0,E6 0.0}\n`;
+            content += `pMove[${i + 1}]={X 0.0,Y 0.0,Z 0.0,A 0.0,B 0.0,C 0.0,S 0,T 0,E1 0.0,E2 0.0,E3 0.0,E4 0.0,E5 0.0,E6 0.0}\n`;
         }
         
         content += 'ENDDAT\n';
