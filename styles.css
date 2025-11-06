@@ -41,10 +41,42 @@ header h1 {
 .tool-group {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
     padding: 5px 10px;
     background: rgba(255,255,255,0.1);
     border-radius: 8px;
+}
+
+.play-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    background: rgba(0,255,100,0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(0,255,100,0.3);
+}
+
+.play-group span {
+    color: #00ff64;
+    font-weight: bold;
+}
+
+.play-btn {
+    background: linear-gradient(135deg, #00ff64, #00cc50) !important;
+    color: white !important;
+    border: none !important;
+    padding: 8px 12px !important;
+    border-radius: 6px !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+}
+
+.play-btn:hover {
+    background: linear-gradient(135deg, #00cc50, #009940) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 8px rgba(0,255,100,0.3) !important;
 }
 
 .tool-group span {
@@ -416,6 +448,11 @@ main {
 
 #splineCanvas {
     z-index: 3;
+    background: transparent;
+}
+
+#animationCanvas {
+    z-index: 4;
     background: transparent;
 }
 

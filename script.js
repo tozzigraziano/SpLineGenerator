@@ -18,6 +18,14 @@ class SplineGenerator {
         this.lastSelectedIndex = -1; // For shift selection
         this.lastSnapIndicator = null; // For snap indicator cleanup
         
+        // Animation properties
+        this.isAnimating = false;
+        this.isPaused = false;
+        this.animationProgress = 0;
+        this.animationStartTime = 0;
+        this.animationRequestId = null;
+        this.totalAnimationTime = 0;
+        
         // Draw grid after everything is initialized
         setTimeout(() => {
             this.drawGrid();
@@ -32,8 +40,9 @@ class SplineGenerator {
         this.gridCanvas = document.getElementById('gridCanvas');
         this.shapeCanvas = document.getElementById('shapeCanvas');
         this.splineCanvas = document.getElementById('splineCanvas');
+        this.animationCanvas = document.getElementById('animationCanvas');
         
-        if (!this.gridCanvas || !this.shapeCanvas || !this.splineCanvas) {
+        if (!this.gridCanvas || !this.shapeCanvas || !this.splineCanvas || !this.animationCanvas) {
             console.error('Canvas elements not found!');
             return;
         }
@@ -53,6 +62,11 @@ class SplineGenerator {
         this.saveSettingsBtn = document.getElementById('saveSettings');
         this.resetSettingsBtn = document.getElementById('resetSettings');
         this.closeBtn = document.querySelector('.close');
+        
+        // Animation buttons
+        this.playBtn = document.getElementById('playBtn');
+        this.pauseBtn = document.getElementById('pauseBtn');
+        this.stopBtn = document.getElementById('stopBtn');
         
         // Side panel elements
         this.tabButtons = document.querySelectorAll('.tab-btn');
@@ -106,12 +120,13 @@ class SplineGenerator {
         this.gridCtx = this.gridCanvas.getContext('2d');
         this.shapeCtx = this.shapeCanvas.getContext('2d');
         this.splineCtx = this.splineCanvas.getContext('2d');
+        this.animationCtx = this.animationCanvas.getContext('2d');
         
         // Set canvas size
         this.canvasWidth = 1200;
         this.canvasHeight = 800;
         
-        [this.gridCanvas, this.shapeCanvas, this.splineCanvas].forEach(canvas => {
+        [this.gridCanvas, this.shapeCanvas, this.splineCanvas, this.animationCanvas].forEach(canvas => {
             canvas.width = this.canvasWidth;
             canvas.height = this.canvasHeight;
         });
@@ -169,6 +184,19 @@ class SplineGenerator {
         
         if (this.clearShapesBtn) {
             this.clearShapesBtn.addEventListener('click', () => this.clearShapes());
+        }
+        
+        // Animation buttons
+        if (this.playBtn) {
+            this.playBtn.addEventListener('click', () => this.startAnimation());
+        }
+        
+        if (this.pauseBtn) {
+            this.pauseBtn.addEventListener('click', () => this.pauseAnimation());
+        }
+        
+        if (this.stopBtn) {
+            this.stopBtn.addEventListener('click', () => this.stopAnimation());
         }
         
         // Canvas events
@@ -1540,6 +1568,213 @@ class SplineGenerator {
             x: (shape.start.x + shape.end.x) / 2,
             y: (shape.start.y + shape.end.y) / 2
         };
+    }
+    
+    // Animation methods
+    calculateTotalAnimationTime() {
+        if (this.splinePoints.length < 2) return 0;
+        
+        let totalTime = 0;
+        for (let i = 0; i < this.splinePoints.length - 1; i++) {
+            const p1 = this.splinePoints[i];
+            const p2 = this.splinePoints[i + 1];
+            
+            const distance = Math.sqrt(
+                Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
+            );
+            
+            const velocity = p1.velocity || 30; // mm/s
+            totalTime += distance / velocity; // seconds
+        }
+        
+        return totalTime * 1000; // Convert to milliseconds
+    }
+    
+    startAnimation() {
+        if (this.splinePoints.length < 2) {
+            alert('Aggiungi almeno 2 punti alla spline per avviare l\'animazione!');
+            return;
+        }
+        
+        this.isAnimating = true;
+        this.isPaused = false;
+        this.animationProgress = 0;
+        this.totalAnimationTime = this.calculateTotalAnimationTime();
+        this.animationStartTime = performance.now();
+        
+        // Update button visibility
+        this.playBtn.style.display = 'none';
+        this.pauseBtn.style.display = 'inline-block';
+        
+        this.animate();
+    }
+    
+    pauseAnimation() {
+        this.isPaused = true;
+        this.isAnimating = false;
+        
+        if (this.animationRequestId) {
+            cancelAnimationFrame(this.animationRequestId);
+            this.animationRequestId = null;
+        }
+        
+        // Update button visibility
+        this.playBtn.style.display = 'inline-block';
+        this.pauseBtn.style.display = 'none';
+    }
+    
+    stopAnimation() {
+        this.isAnimating = false;
+        this.isPaused = false;
+        this.animationProgress = 0;
+        
+        if (this.animationRequestId) {
+            cancelAnimationFrame(this.animationRequestId);
+            this.animationRequestId = null;
+        }
+        
+        // Clear animation canvas
+        this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        
+        // Update button visibility
+        this.playBtn.style.display = 'inline-block';
+        this.pauseBtn.style.display = 'none';
+    }
+    
+    animate() {
+        if (!this.isAnimating) return;
+        
+        const currentTime = performance.now();
+        const elapsedTime = currentTime - this.animationStartTime;
+        
+        // Clear animation canvas
+        this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        
+        // Calculate current position based on velocity
+        const position = this.calculateAnimationPosition(elapsedTime);
+        
+        if (position) {
+            // Draw animated spline up to current position
+            this.drawAnimatedSpline(position.segmentIndex, position.progress);
+            
+            // Draw position indicator
+            this.drawPositionIndicator(position.x, position.y);
+        }
+        
+        // Continue animation if not finished
+        if (elapsedTime < this.totalAnimationTime) {
+            this.animationRequestId = requestAnimationFrame(() => this.animate());
+        } else {
+            // Animation finished
+            this.stopAnimation();
+        }
+    }
+    
+    calculateAnimationPosition(elapsedTime) {
+        if (this.splinePoints.length < 2) return null;
+        
+        let currentTime = 0;
+        
+        for (let i = 0; i < this.splinePoints.length - 1; i++) {
+            const p1 = this.splinePoints[i];
+            const p2 = this.splinePoints[i + 1];
+            
+            const distance = Math.sqrt(
+                Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
+            );
+            
+            const velocity = p1.velocity || 30; // mm/s
+            const segmentTime = (distance / velocity) * 1000; // milliseconds
+            
+            if (elapsedTime <= currentTime + segmentTime) {
+                // Current position is in this segment
+                const segmentProgress = (elapsedTime - currentTime) / segmentTime;
+                
+                const x = p1.x + (p2.x - p1.x) * segmentProgress;
+                const y = p1.y + (p2.y - p1.y) * segmentProgress;
+                
+                return {
+                    x: x,
+                    y: y,
+                    segmentIndex: i,
+                    progress: segmentProgress
+                };
+            }
+            
+            currentTime += segmentTime;
+        }
+        
+        // Return last point if beyond animation time
+        const lastPoint = this.splinePoints[this.splinePoints.length - 1];
+        return {
+            x: lastPoint.x,
+            y: lastPoint.y,
+            segmentIndex: this.splinePoints.length - 2,
+            progress: 1
+        };
+    }
+    
+    drawAnimatedSpline(currentSegmentIndex, segmentProgress) {
+        if (this.splinePoints.length < 2) return;
+        
+        this.animationCtx.strokeStyle = '#ff6600';
+        this.animationCtx.lineWidth = 4;
+        this.animationCtx.lineCap = 'round';
+        this.animationCtx.lineJoin = 'round';
+        
+        this.animationCtx.beginPath();
+        
+        // Draw completed segments
+        for (let i = 0; i < currentSegmentIndex; i++) {
+            const p1 = this.splinePoints[i];
+            const p2 = this.splinePoints[i + 1];
+            
+            const screenP1 = this.worldToScreen(p1.x, p1.y);
+            const screenP2 = this.worldToScreen(p2.x, p2.y);
+            
+            if (i === 0) {
+                this.animationCtx.moveTo(screenP1.x, screenP1.y);
+            }
+            this.animationCtx.lineTo(screenP2.x, screenP2.y);
+        }
+        
+        // Draw partial current segment
+        if (currentSegmentIndex < this.splinePoints.length - 1) {
+            const p1 = this.splinePoints[currentSegmentIndex];
+            const p2 = this.splinePoints[currentSegmentIndex + 1];
+            
+            const currentX = p1.x + (p2.x - p1.x) * segmentProgress;
+            const currentY = p1.y + (p2.y - p1.y) * segmentProgress;
+            
+            const screenP1 = this.worldToScreen(p1.x, p1.y);
+            const screenCurrent = this.worldToScreen(currentX, currentY);
+            
+            if (currentSegmentIndex === 0 && this.splinePoints.length === 2) {
+                this.animationCtx.moveTo(screenP1.x, screenP1.y);
+            }
+            this.animationCtx.lineTo(screenCurrent.x, screenCurrent.y);
+        }
+        
+        this.animationCtx.stroke();
+    }
+    
+    drawPositionIndicator(worldX, worldY) {
+        const screenPos = this.worldToScreen(worldX, worldY);
+        
+        // Draw outer circle (white border)
+        this.animationCtx.fillStyle = 'white';
+        this.animationCtx.strokeStyle = '#333';
+        this.animationCtx.lineWidth = 2;
+        this.animationCtx.beginPath();
+        this.animationCtx.arc(screenPos.x, screenPos.y, 8, 0, 2 * Math.PI);
+        this.animationCtx.fill();
+        this.animationCtx.stroke();
+        
+        // Draw inner circle (orange)
+        this.animationCtx.fillStyle = '#ff6600';
+        this.animationCtx.beginPath();
+        this.animationCtx.arc(screenPos.x, screenPos.y, 5, 0, 2 * Math.PI);
+        this.animationCtx.fill();
     }
 }
 

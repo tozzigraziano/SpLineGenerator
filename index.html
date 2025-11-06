@@ -28,6 +28,12 @@
                     <button id="rectBtn" class="btn tool-btn" data-tool="rectangle">⬜ Rettangolo</button>
                     <button id="circleBtn" class="btn tool-btn" data-tool="circle">⭕ Cerchio</button>
                 </div>
+                <div class="play-group">
+                    <span>Animazione:</span>
+                    <button id="playBtn" class="btn play-btn">▶️ Play</button>
+                    <button id="pauseBtn" class="btn play-btn" style="display: none;">⏸️ Pausa</button>
+                    <button id="stopBtn" class="btn play-btn">⏹️ Stop</button>
+                </div>
                 <div class="info">
                     <span id="coordinates">X: 0 mm, Y: 0 mm</span>
                 </div>
@@ -40,6 +46,7 @@
                     <canvas id="gridCanvas" width="1200" height="800"></canvas>
                     <canvas id="shapeCanvas" width="1200" height="800"></canvas>
                     <canvas id="splineCanvas" width="1200" height="800"></canvas>
+                    <canvas id="animationCanvas" width="1200" height="800"></canvas>
                 </div>
                 
                 <div id="sidePanel" class="side-panel">
