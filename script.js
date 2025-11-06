@@ -699,8 +699,8 @@ class SplineGenerator {
             row.innerHTML = `
                 <td><input type="checkbox" class="point-checkbox" data-index="${index}" ${isSelected ? 'checked' : ''}></td>
                 <td>${point.id}</td>
-                <td>${point.x.toFixed(2)}</td>
-                <td>${point.y.toFixed(2)}</td>
+                <td><input type="number" class="coord-input" data-index="${index}" data-coord="x" value="${point.x.toFixed(2)}" step="0.1"></td>
+                <td><input type="number" class="coord-input" data-index="${index}" data-coord="y" value="${point.y.toFixed(2)}" step="0.1"></td>
                 <td><input type="number" class="velocity-input" data-index="${index}" value="${point.velocity}" min="0" step="0.1"></td>
                 <td>
                     <button class="btn-mini edit" onclick="window.splineApp.focusPoint(${index})">📍</button>
@@ -714,7 +714,47 @@ class SplineGenerator {
         document.querySelectorAll('.velocity-input').forEach(input => {
             input.addEventListener('change', (e) => {
                 const index = parseInt(e.target.dataset.index);
-                this.splinePoints[index].velocity = parseFloat(e.target.value);
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value) && value >= 0) {
+                    this.splinePoints[index].velocity = value;
+                }
+            });
+            
+            // Add validation on blur
+            input.addEventListener('blur', (e) => {
+                const value = parseFloat(e.target.value);
+                if (isNaN(value) || value < 0) {
+                    const index = parseInt(e.target.dataset.index);
+                    e.target.value = this.splinePoints[index].velocity || 30;
+                }
+            });
+        });
+        
+        // Add event listeners for coordinate inputs
+        document.querySelectorAll('.coord-input').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                const coord = e.target.dataset.coord;
+                const value = parseFloat(e.target.value);
+                
+                if (!isNaN(value)) {
+                    // Update the point coordinates
+                    this.splinePoints[index][coord] = value;
+                    
+                    // Redraw the spline and shapes
+                    this.drawSpline();
+                    this.highlightSelectedPoints();
+                }
+            });
+            
+            // Add input validation on blur
+            input.addEventListener('blur', (e) => {
+                const value = parseFloat(e.target.value);
+                if (isNaN(value)) {
+                    const index = parseInt(e.target.dataset.index);
+                    const coord = e.target.dataset.coord;
+                    e.target.value = this.splinePoints[index][coord].toFixed(2);
+                }
             });
         });
         
@@ -775,15 +815,71 @@ class SplineGenerator {
             row.innerHTML = `
                 <td>${shape.id}</td>
                 <td>${shape.type === 'rectangle' ? 'Rettangolo' : 'Cerchio'}</td>
-                <td>${position.x.toFixed(2)}</td>
-                <td>${position.y.toFixed(2)}</td>
-                <td>${dimensions}</td>
+                <td><input type="number" class="shape-coord-input" data-index="${index}" data-coord="x" value="${position.x.toFixed(2)}" step="0.1"></td>
+                <td><input type="number" class="shape-coord-input" data-index="${index}" data-coord="y" value="${position.y.toFixed(2)}" step="0.1"></td>
+                <td>${this.getEditableDimensions(shape, index)}</td>
                 <td>
                     <button class="btn-mini edit" onclick="window.splineApp.focusShape(${index})">📍</button>
                     <button class="btn-mini" onclick="window.splineApp.removeShape(${index})">🗑️</button>
                 </td>
             `;
             this.shapesTableBody.appendChild(row);
+        });
+        
+        // Add event listeners for shape coordinate inputs
+        document.querySelectorAll('.shape-coord-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                const coord = e.target.dataset.coord;
+                const value = parseFloat(e.target.value);
+                
+                if (!isNaN(value)) {
+                    this.updateShapePosition(index, coord, value);
+                }
+            });
+            
+            input.addEventListener('change', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                const coord = e.target.dataset.coord;
+                const value = parseFloat(e.target.value);
+                
+                if (!isNaN(value)) {
+                    this.updateShapePosition(index, coord, value);
+                }
+            });
+            
+            input.addEventListener('blur', (e) => {
+                const value = parseFloat(e.target.value);
+                if (isNaN(value)) {
+                    const index = parseInt(e.target.dataset.index);
+                    const coord = e.target.dataset.coord;
+                    const position = this.getShapePosition(this.shapes[index]);
+                    e.target.value = position[coord].toFixed(2);
+                }
+            });
+        });
+        
+        // Add event listeners for shape dimension inputs
+        document.querySelectorAll('.shape-dimension-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                const dimension = e.target.dataset.dimension;
+                const value = parseFloat(e.target.value);
+                
+                if (!isNaN(value) && value > 0) {
+                    this.updateShapeDimension(index, dimension, value);
+                }
+            });
+            
+            input.addEventListener('change', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                const dimension = e.target.dataset.dimension;
+                const value = parseFloat(e.target.value);
+                
+                if (!isNaN(value) && value > 0) {
+                    this.updateShapeDimension(index, dimension, value);
+                }
+            });
         });
         
         this.updateShapesCount();
@@ -802,11 +898,28 @@ class SplineGenerator {
         return '';
     }
 
+    getEditableDimensions(shape, index) {
+        const width = Math.abs(shape.end.x - shape.start.x);
+        const height = Math.abs(shape.end.y - shape.start.y);
+        
+        if (shape.type === 'rectangle') {
+            return `<input type="number" class="shape-dimension-input" data-index="${index}" data-dimension="width" value="${width.toFixed(1)}" min="0.1" step="0.1" style="width:50px"> × 
+                    <input type="number" class="shape-dimension-input" data-index="${index}" data-dimension="height" value="${height.toFixed(1)}" min="0.1" step="0.1" style="width:50px"> mm`;
+        } else if (shape.type === 'circle') {
+            // Per i cerchi, il raggio è la distanza tra start e end
+            const radius = Math.sqrt(width * width + height * height);
+            const diameter = radius * 2;
+            return `⌀ <input type="number" class="shape-dimension-input" data-index="${index}" data-dimension="diameter" value="${diameter.toFixed(1)}" min="0.1" step="0.1" style="width:60px"> mm`;
+        }
+        return '';
+    }
+
     getShapePosition(shape) {
         if (shape.type === 'rectangle') {
+            // Per i rettangoli, restituiamo la posizione dell'angolo di partenza (start)
             return {
-                x: Math.min(shape.start.x, shape.end.x),
-                y: Math.min(shape.start.y, shape.end.y)
+                x: shape.start.x,
+                y: shape.start.y
             };
         } else if (shape.type === 'circle') {
             return shape.start; // Center of circle
@@ -1214,6 +1327,78 @@ class SplineGenerator {
         } catch (e) {
             console.error('Error loading settings:', e);
         }
+    }
+
+    updateShapePosition(index, coord, value) {
+        const shape = this.shapes[index];
+        if (!shape) return;
+        
+        const currentPosition = this.getShapePosition(shape);
+        const deltaX = coord === 'x' ? value - currentPosition.x : 0;
+        const deltaY = coord === 'y' ? value - currentPosition.y : 0;
+        
+        console.log(`Updating shape ${index} position: ${coord} = ${value}, delta: ${deltaX}, ${deltaY}`);
+        
+        if (shape.type === 'rectangle') {
+            // Per i rettangoli: spostiamo entrambi i punti per mantenere le dimensioni
+            shape.start.x += deltaX;
+            shape.start.y += deltaY;
+            shape.end.x += deltaX;
+            shape.end.y += deltaY;
+        } else if (shape.type === 'circle') {
+            // For circles: move start (center), keep radius by updating end
+            const radius = Math.sqrt(
+                Math.pow(shape.end.x - shape.start.x, 2) + 
+                Math.pow(shape.end.y - shape.start.y, 2)
+            );
+            shape.start.x += deltaX;
+            shape.start.y += deltaY;
+            // Update end to maintain radius
+            shape.end.x = shape.start.x + radius;
+            shape.end.y = shape.start.y;
+        }
+        
+        this.redrawShapes();
+        // Don't call updateShapesTable() to avoid recursion - table will be updated when input loses focus
+    }
+
+    updateShapeDimension(index, dimension, value) {
+        const shape = this.shapes[index];
+        if (!shape) return;
+        
+        console.log(`Updating shape ${index} dimension: ${dimension} = ${value}`);
+        
+        if (shape.type === 'rectangle') {
+            // Per i rettangoli: start è l'angolo, end è l'angolo opposto
+            // Manteniamo start fisso e cambiamo end per ridimensionare
+            if (dimension === 'width') {
+                // Cambia solo la coordinata X di end mantenendo la larghezza
+                const direction = shape.end.x > shape.start.x ? 1 : -1;
+                shape.end.x = shape.start.x + (value * direction);
+            } else if (dimension === 'height') {
+                // Cambia solo la coordinata Y di end mantenendo l'altezza
+                const direction = shape.end.y > shape.start.y ? 1 : -1;
+                shape.end.y = shape.start.y + (value * direction);
+            }
+        } else if (shape.type === 'circle' && dimension === 'diameter') {
+            // Per i cerchi: start è il centro, end definisce il raggio
+            const radius = value / 2;
+            // Manteniamo start come centro del cerchio
+            const center = { x: shape.start.x, y: shape.start.y };
+            // end rappresenta un punto sul raggio (distanza = raggio)
+            shape.end.x = center.x + radius;
+            shape.end.y = center.y; // punto sulla linea orizzontale per semplicità
+        }
+        
+        this.redrawShapes();
+        // Don't call updateShapesTable() to avoid recursion - table will be updated when input loses focus
+    }
+
+    getShapeCenter(shape) {
+        return {
+            x: (shape.start.x + shape.end.x) / 2,
+            y: (shape.start.y + shape.end.y) / 2
+        };
     }
 }
 

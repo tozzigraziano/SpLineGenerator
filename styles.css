@@ -270,6 +270,60 @@ main {
     font-size: 12px;
 }
 
+/* Stili specifici per input coordinate */
+.table-container input.coord-input {
+    width: 70px;
+    background-color: #f8f9fa;
+}
+
+.table-container input.coord-input:focus {
+    background-color: #fff;
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+/* Stili per input velocità */
+.table-container input.velocity-input {
+    width: 80px;
+    background-color: #fff3cd;
+}
+
+.table-container input.velocity-input:focus {
+    background-color: #fff;
+    border-color: #ffc107;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255,193,7,0.25);
+}
+
+/* Stili per input delle geometrie */
+.table-container input.shape-coord-input {
+    width: 70px;
+    background-color: #e8f4fd;
+}
+
+.table-container input.shape-coord-input:focus {
+    background-color: #fff;
+    border-color: #17a2b8;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(23,162,184,0.25);
+}
+
+.table-container input.shape-dimension-input {
+    background-color: #f8d7da;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-size: 11px;
+}
+
+.table-container input.shape-dimension-input:focus {
+    background-color: #fff;
+    border-color: #dc3545;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(220,53,69,0.25);
+}
+
 .table-container .btn-mini {
     padding: 3px 6px;
     font-size: 11px;
