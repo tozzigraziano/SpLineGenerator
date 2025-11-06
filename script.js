@@ -2097,11 +2097,37 @@ END`
     generateKukaDatFromTemplate(projectName, template) {
         const numPoints = this.splinePoints.length;
         
-        // Generate FRAME positions
+        // Generate FRAME positions using axis labels
         let framePositions = '';
         for (let i = 0; i < this.splinePoints.length; i++) {
             const point = this.splinePoints[i];
-            framePositions += `pSpl[${i + 1}]={X ${point.x.toFixed(1)},Y ${point.y.toFixed(1)},Z 0.0,A 0.0,B 0.0,C 0.0}\n`;
+            
+            // Use the configured axis labels
+            const xAxisLabel = this.settings.xAxisLabel || 'X';
+            const yAxisLabel = this.settings.yAxisLabel || 'Y';
+            
+            // Map canvas coordinates to KUKA coordinates based on axis labels
+            let kukaX = 0.0, kukaY = 0.0, kukaZ = 0.0;
+            
+            // Map horizontal canvas coordinate (point.x) to KUKA axis
+            if (xAxisLabel === 'X') {
+                kukaX = point.x;
+            } else if (xAxisLabel === 'Y') {
+                kukaY = point.x;
+            } else if (xAxisLabel === 'Z') {
+                kukaZ = point.x;
+            }
+            
+            // Map vertical canvas coordinate (point.y) to KUKA axis
+            if (yAxisLabel === 'X') {
+                kukaX = point.y;
+            } else if (yAxisLabel === 'Y') {
+                kukaY = point.y;
+            } else if (yAxisLabel === 'Z') {
+                kukaZ = point.y;
+            }
+            
+            framePositions += `pSpl[${i + 1}]={X ${kukaX.toFixed(1)},Y ${kukaY.toFixed(1)},Z ${kukaZ.toFixed(1)},A 0.0,B 0.0,C 0.0}\n`;
         }
         
         // Generate MOVE positions (all zeros)
