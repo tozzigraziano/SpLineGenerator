@@ -61,6 +61,26 @@ header h1 {
     border-radius: 8px;
 }
 
+.file-group input[type="text"] {
+    width: 150px;
+    padding: 6px 10px;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    font-size: 14px;
+}
+
+.file-group input[type="text"]:focus {
+    outline: none;
+    border-color: rgba(255,255,255,0.6);
+    background: rgba(255,255,255,0.3);
+}
+
+.file-group input[type="text"]::placeholder {
+    color: rgba(255,255,255,0.7);
+}
+
 .clear-group {
     display: flex;
     align-items: center;

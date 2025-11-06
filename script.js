@@ -1285,9 +1285,21 @@ class SplineGenerator {
         const dataStr = JSON.stringify(projectData, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
         
+        // Ottieni il nome del progetto dall'input o usa il timestamp come fallback
+        const projectNameInput = document.getElementById('projectName');
+        let fileName = 'spline-project';
+        
+        if (projectNameInput && projectNameInput.value.trim()) {
+            // Usa il nome del progetto specificato, rimuovendo caratteri non validi
+            fileName = projectNameInput.value.trim().replace(/[^a-zA-Z0-9_\-]/g, '-');
+        } else {
+            // Usa il timestamp come fallback
+            fileName = `spline-project-${new Date().toISOString().slice(0,10)}`;
+        }
+        
         const link = document.createElement('a');
         link.href = URL.createObjectURL(dataBlob);
-        link.download = `spline-project-${new Date().toISOString().slice(0,10)}.json`;
+        link.download = `${fileName}.json`;
         link.click();
         
         URL.revokeObjectURL(link.href);
