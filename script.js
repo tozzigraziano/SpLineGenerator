@@ -16,6 +16,7 @@ class SplineGenerator {
         this.lastSampleTime = 0;
         this.selectedPoints = new Set(); // Track selected points
         this.lastSelectedIndex = -1; // For shift selection
+        this.lastSnapIndicator = null; // For snap indicator cleanup
         
         // Draw grid after everything is initialized
         setTimeout(() => {
@@ -43,7 +44,11 @@ class SplineGenerator {
         
         // Buttons
         this.settingsBtn = document.getElementById('settingsBtn');
-        this.clearBtn = document.getElementById('clearBtn');
+        this.saveBtn = document.getElementById('saveBtn');
+        this.loadBtn = document.getElementById('loadBtn');
+        this.fileInput = document.getElementById('fileInput');
+        this.clearSplineBtn = document.getElementById('clearSplineBtn');
+        this.clearShapesBtn = document.getElementById('clearShapesBtn');
         this.toolButtons = document.querySelectorAll('.tool-btn');
         this.saveSettingsBtn = document.getElementById('saveSettings');
         this.resetSettingsBtn = document.getElementById('resetSettings');
@@ -144,9 +149,26 @@ class SplineGenerator {
             });
         }
         
-        // Clear button
-        if (this.clearBtn) {
-            this.clearBtn.addEventListener('click', () => this.clearAll());
+        // File buttons
+        if (this.saveBtn) {
+            this.saveBtn.addEventListener('click', () => this.saveProject());
+        }
+        
+        if (this.loadBtn) {
+            this.loadBtn.addEventListener('click', () => this.fileInput.click());
+        }
+        
+        if (this.fileInput) {
+            this.fileInput.addEventListener('change', (e) => this.loadProject(e));
+        }
+        
+        // Clear buttons
+        if (this.clearSplineBtn) {
+            this.clearSplineBtn.addEventListener('click', () => this.clearSpline());
+        }
+        
+        if (this.clearShapesBtn) {
+            this.clearShapesBtn.addEventListener('click', () => this.clearShapes());
         }
         
         // Canvas events
@@ -1207,6 +1229,15 @@ class SplineGenerator {
         this.lastSnapIndicator = { x: screenPos.x, y: screenPos.y };
     }
 
+    clearSnapIndicator() {
+        if (this.lastSnapIndicator) {
+            // Instead of clearRect (which might erase parts of the spline),
+            // redraw the spline to remove the indicator
+            this.drawSpline();
+            this.lastSnapIndicator = null;
+        }
+    }
+
     // Utility functions
     updateCoordinates(worldPos, snappedPos = null) {
         if (snappedPos && this.settings.enableSnap) {
@@ -1218,14 +1249,102 @@ class SplineGenerator {
         }
     }
 
-    clearAll() {
-        this.splineCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
-        this.shapeCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
-        this.splinePoints = [];
-        this.shapes = [];
-        this.isDrawing = false;
-        this.updateSplineTable();
-        this.updateShapesTable();
+    clearSpline() {
+        if (confirm('Eliminare tutti i punti della spline?')) {
+            this.splinePoints = [];
+            this.selectedPoints.clear();
+            this.lastSelectedIndex = null;
+            
+            // Clear the spline canvas
+            this.splineCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+            
+            this.updateSplineTable();
+        }
+    }
+
+    clearShapes() {
+        if (confirm('Eliminare tutte le geometrie?')) {
+            this.shapes = [];
+            
+            // Clear the shapes canvas
+            this.shapeCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+            
+            this.updateShapesTable();
+        }
+    }
+
+    saveProject() {
+        const projectData = {
+            version: '1.0',
+            timestamp: new Date().toISOString(),
+            settings: this.settings,
+            splinePoints: this.splinePoints,
+            shapes: this.shapes
+        };
+        
+        const dataStr = JSON.stringify(projectData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `spline-project-${new Date().toISOString().slice(0,10)}.json`;
+        link.click();
+        
+        URL.revokeObjectURL(link.href);
+    }
+
+    loadProject(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const projectData = JSON.parse(e.target.result);
+                
+                // Validate project data
+                if (!projectData.version || !projectData.splinePoints || !projectData.shapes) {
+                    throw new Error('File non valido');
+                }
+                
+                // Clear everything before loading new project
+                this.splinePoints = [];
+                this.shapes = [];
+                this.selectedPoints.clear();
+                this.lastSelectedIndex = null;
+                this.lastSnapIndicator = null;
+                
+                // Clear all canvases
+                this.splineCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+                this.shapeCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+                
+                // Load data from project
+                if (projectData.settings) {
+                    this.settings = { ...this.settings, ...projectData.settings };
+                    this.saveSettings(); // Update localStorage
+                }
+                
+                this.splinePoints = projectData.splinePoints || [];
+                this.shapes = projectData.shapes || [];
+                
+                // Redraw everything
+                this.drawGrid();
+                this.drawSpline();
+                this.redrawShapes();
+                this.updateSplineTable();
+                this.updateShapesTable();
+                
+                alert('Progetto caricato con successo!');
+                
+            } catch (error) {
+                alert('Errore nel caricamento del file: ' + error.message);
+            }
+        };
+        
+        reader.readAsText(file);
+        
+        // Reset file input
+        event.target.value = '';
     }
 
     // Settings functionality
@@ -1420,8 +1539,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const app = new SplineGenerator();
         console.log('SplineGenerator initialized successfully');
         
-        // Make app globally accessible for debugging
+        // Make app globally accessible for debugging and HTML onclick handlers
         window.splineApp = app;
+        window.splineGenerator = app;
     } catch (error) {
         console.error('Error initializing SplineGenerator:', error);
     }

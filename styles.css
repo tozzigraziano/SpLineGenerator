@@ -52,6 +52,24 @@ header h1 {
     font-size: 14px;
 }
 
+.file-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+}
+
+.clear-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+}
+
 /* Buttons */
 .btn {
     background: rgba(255,255,255,0.2);
@@ -81,6 +99,15 @@ header h1 {
     border-radius: 6px;
     font-family: 'Courier New', monospace;
     font-size: 13px;
+}
+
+.btn-warning {
+    background: linear-gradient(145deg, #ffc107, #e0a800);
+    color: #212529;
+}
+
+.btn-warning:hover {
+    background: linear-gradient(145deg, #e0a800, #d39e00);
 }
 
 /* Main content */

@@ -12,7 +12,15 @@
             <h1>SpLine Generator</h1>
             <div class="toolbar">
                 <button id="settingsBtn" class="btn">⚙️ Impostazioni</button>
-                <button id="clearBtn" class="btn">🗑️ Pulisci</button>
+                <div class="file-group">
+                    <button id="saveBtn" class="btn">💾 Salva Progetto</button>
+                    <button id="loadBtn" class="btn">📁 Carica Progetto</button>
+                    <input type="file" id="fileInput" accept=".json" style="display: none;">
+                </div>
+                <div class="clear-group">
+                    <button id="clearSplineBtn" class="btn btn-warning">🗑️ Pulisci Spline</button>
+                    <button id="clearShapesBtn" class="btn btn-warning">🗑️ Pulisci Geometrie</button>
+                </div>
                 <div class="tool-group">
                     <span>Strumenti:</span>
                     <button id="splineBtn" class="btn tool-btn active" data-tool="spline">📏 Spline</button>
