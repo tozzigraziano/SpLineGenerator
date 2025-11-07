@@ -236,7 +236,25 @@ class SplineGenerator {
             this.splineCanvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
             this.splineCanvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
             this.splineCanvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
-            this.splineCanvas.addEventListener('mouseleave', (e) => this.handleMouseUp(e));
+            
+            // Don't end drawing when mouse leaves canvas - allow continuation
+            this.splineCanvas.addEventListener('mouseleave', (e) => {
+                console.log('Mouse left canvas, but continuing drawing...');
+                // Don't call handleMouseUp here to allow drawing continuation
+            });
+            
+            // Global events to continue drawing outside canvas
+            document.addEventListener('mousemove', (e) => {
+                if (this.isMouseDown) {
+                    this.handleMouseMove(e);
+                }
+            });
+            
+            document.addEventListener('mouseup', (e) => {
+                if (this.isMouseDown) {
+                    this.handleMouseUp(e);
+                }
+            });
             
             // Test click event
             this.splineCanvas.addEventListener('click', (e) => {
@@ -603,6 +621,8 @@ class SplineGenerator {
         const offsetX = (this.canvasWidth - usedWidth) / 2;
         const offsetY = (this.canvasHeight - usedHeight) / 2;
         
+        // Allow conversion even when mouse is outside the canvas bounds
+        // This enables drawing continuation when mouse exits the canvas area
         const worldX = this.settings.minX + ((canvasX - offsetX) / scale);
         const worldY = this.settings.maxY - ((canvasY - offsetY) / scale);
         
@@ -648,10 +668,11 @@ class SplineGenerator {
         };
     }
 
-    // Get mouse position with snap applied
+    // Get mouse position with snap applied and clamped to graph limits
     getMousePosition(e) {
         const rawPos = this.screenToWorld(e.clientX, e.clientY);
-        return this.snapToGrid(rawPos);
+        const snappedPos = this.snapToGrid(rawPos);
+        return this.clampToGraphLimits(snappedPos);
     }
 
     // Mouse event handlers
@@ -709,9 +730,6 @@ class SplineGenerator {
 
     // Spline functionality
     startSpline(worldPos) {
-        // Clamp coordinates to graph limits
-        worldPos = this.clampToGraphLimits(worldPos);
-        
         if (!this.isDrawing) {
             // Clear any existing animation when starting a new spline
             if (this.animationCtx) {
@@ -730,9 +748,6 @@ class SplineGenerator {
     }
 
     continueSampling(worldPos) {
-        // Clamp coordinates to graph limits
-        worldPos = this.clampToGraphLimits(worldPos);
-        
         const now = Date.now();
         const lastPoint = this.splinePoints[this.splinePoints.length - 1];
         const distance = Math.sqrt(
@@ -753,6 +768,8 @@ class SplineGenerator {
     }
 
     clampToGraphLimits(worldPos) {
+        // Clamp coordinates strictly to the graph limits without any margin
+        // This prevents drawing outside the defined graph area
         return {
             x: Math.max(this.settings.minX, Math.min(this.settings.maxX, worldPos.x)),
             y: Math.max(this.settings.minY, Math.min(this.settings.maxY, worldPos.y))
@@ -814,9 +831,6 @@ class SplineGenerator {
 
     // Shape functionality
     startShape(worldPos) {
-        // Clamp coordinates to graph limits
-        worldPos = this.clampToGraphLimits(worldPos);
-        
         this.tempShape = {
             type: this.currentTool,
             start: worldPos,
@@ -827,9 +841,6 @@ class SplineGenerator {
     updateShapePreview(worldPos) {
         if (!this.tempShape) return;
         
-        // Clamp coordinates to graph limits
-        worldPos = this.clampToGraphLimits(worldPos);
-        
         this.tempShape.end = worldPos;
         this.redrawShapes();
         this.drawShapePreview();
@@ -837,9 +848,6 @@ class SplineGenerator {
 
     finishShape(worldPos) {
         if (!this.tempShape) return;
-        
-        // Clamp coordinates to graph limits
-        worldPos = this.clampToGraphLimits(worldPos);
         
         this.tempShape.end = worldPos;
         this.shapes.push({ ...this.tempShape });
