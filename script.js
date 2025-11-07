@@ -2971,35 +2971,8 @@ class SplineGenerator {
             // Generate ZIP blob
             const zipBlob = await zip.generateAsync({type: "blob"});
             
-            // Try using File System Access API for save dialog
-            if ('showSaveFilePicker' in window) {
-                try {
-                    const fileHandle = await window.showSaveFilePicker({
-                        suggestedName: `${projectName}_robot_export_${timestamp}.zip`,
-                        types: [{
-                            description: 'ZIP archives',
-                            accept: { 'application/zip': ['.zip'] }
-                        }]
-                    });
-                    
-                    const writable = await fileHandle.createWritable();
-                    await writable.write(zipBlob);
-                    await writable.close();
-                    
-                    alert(`Esportazione robot completata!\n\n📦 ${projectName}_robot_export_${timestamp}.zip\n\nContiene:\n✓ ${projectName}.dat\n✓ ${projectName}.src\n✓ ${projectName}_project_${timestamp}.json`);
-                    
-                } catch (error) {
-                    if (error.name !== 'AbortError') {
-                        // Fallback to download
-                        this.downloadFile(zipBlob, `${projectName}_robot_export_${timestamp}.zip`, 'application/zip');
-                        alert(`File ZIP scaricato!\n\n📦 ${projectName}_robot_export_${timestamp}.zip`);
-                    }
-                }
-            } else {
-                // Fallback to download
-                this.downloadFile(zipBlob, `${projectName}_robot_export_${timestamp}.zip`, 'application/zip');
-                alert(`File ZIP scaricato!\n\n📦 ${projectName}_robot_export_${timestamp}.zip`);
-            }
+            // Direct download to Downloads folder (no folder selection)
+            this.downloadFile(zipBlob, `${projectName}_robot_export_${timestamp}.zip`, 'application/zip');
             
         } catch (error) {
             console.error('Error creating ZIP:', error);
@@ -3011,57 +2984,15 @@ class SplineGenerator {
     async fallbackToIndividualFiles(projectName, datContent, srcContent, projectContent) {
         try {
             const timestamp = this.generateTimestamp();
-            let savedCount = 0;
             
-            await this.saveKukaFileWithPicker(datContent, `${projectName}.dat`);
-            savedCount++;
-            await this.saveKukaFileWithPicker(srcContent, `${projectName}.src`);
-            savedCount++;
-            
-            // Also save project file
+            // Direct download to Downloads folder (no folder selection)
+            this.downloadFile(datContent, `${projectName}.dat`, 'text/plain');
+            this.downloadFile(srcContent, `${projectName}.src`, 'text/plain');
             this.downloadFile(projectContent, `${projectName}_project_${timestamp}.json`, 'application/json');
-            savedCount++;
             
-            if (savedCount === 3) {
-                alert(`File esportati separatamente!\n\n✓ ${projectName}.dat\n✓ ${projectName}.src\n✓ ${projectName}_project_${timestamp}.json`);
-            }
         } catch (error) {
             console.error('Fallback to individual files failed:', error);
             alert('Errore durante l\'esportazione dei file individuali');
-        }
-    }
-
-    // Helper function for individual file saving
-    async saveKukaFileWithPicker(content, filename) {
-        try {
-            if ('showSaveFilePicker' in window) {
-                const fileHandle = await window.showSaveFilePicker({
-                    suggestedName: filename,
-                    types: [{
-                        description: 'KUKA Robot files',
-                        accept: { 
-                            'text/plain': ['.dat', '.src'],
-                            'application/octet-stream': ['.dat', '.src']
-                        }
-                    }]
-                });
-                
-                const writable = await fileHandle.createWritable();
-                await writable.write(content);
-                await writable.close();
-                
-                console.log(`KUKA file saved: ${filename}`);
-            } else {
-                // Fallback to download
-                this.downloadFile(content, filename, 'text/plain');
-                console.log(`KUKA file downloaded: ${filename}`);
-            }
-        } catch (error) {
-            if (error.name !== 'AbortError') {
-                // Final fallback to download
-                this.downloadFile(content, filename, 'text/plain');
-                console.log(`KUKA file downloaded (fallback): ${filename}`);
-            }
         }
     }
     
