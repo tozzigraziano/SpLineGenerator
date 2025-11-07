@@ -2745,7 +2745,21 @@ class SplineGenerator {
             // Try using File System Access API for directory selection
             if ('showDirectoryPicker' in window) {
                 try {
+                    // Always show directory picker (no caching of previous selection)
                     const directoryHandle = await window.showDirectoryPicker();
+                    
+                    // Check if files already exist and confirm overwrite
+                    let shouldProceed = true;
+                    try {
+                        await directoryHandle.getFileHandle(`${projectName}.dat`);
+                        shouldProceed = confirm(`Il file ${projectName}.dat esiste già. Vuoi sovrascriverlo?`);
+                    } catch (e) {
+                        // File doesn't exist, proceed
+                    }
+                    
+                    if (!shouldProceed) {
+                        return; // User cancelled overwrite
+                    }
                     
                     // Save .dat file
                     const datFileHandle = await directoryHandle.getFileHandle(`${projectName}.dat`, { create: true });
@@ -2760,19 +2774,55 @@ class SplineGenerator {
                     await srcWritable.close();
                     
                     console.log('KUKA files exported to selected directory:', `${projectName}.dat`, `${projectName}.src`);
-                    alert(`File KUKA esportati con successo!\n${projectName}.dat\n${projectName}.src`);
+                    
+                    // Show success message with directory name if available
+                    let directoryName = 'directory selezionata';
+                    if (directoryHandle.name) {
+                        directoryName = directoryHandle.name;
+                    }
+                    alert(`File KUKA esportati con successo in "${directoryName}"!\n\n✓ ${projectName}.dat\n✓ ${projectName}.src`);
                     
                 } catch (error) {
                     if (error.name !== 'AbortError') {
+                        console.log('Directory picker failed, falling back to individual file saves');
                         // Fallback to individual file saves
-                        await this.saveKukaFileWithPicker(datContent, `${projectName}.dat`);
-                        await this.saveKukaFileWithPicker(srcContent, `${projectName}.src`);
+                        let savedCount = 0;
+                        try {
+                            await this.saveKukaFileWithPicker(datContent, `${projectName}.dat`);
+                            savedCount++;
+                            await this.saveKukaFileWithPicker(srcContent, `${projectName}.src`);
+                            savedCount++;
+                            
+                            if (savedCount === 2) {
+                                alert(`File KUKA esportati con successo (modalità singola)!\n\n✓ ${projectName}.dat\n✓ ${projectName}.src`);
+                            }
+                        } catch (fallbackError) {
+                            if (fallbackError.name !== 'AbortError') {
+                                console.error('Complete fallback failed:', fallbackError);
+                            }
+                        }
+                    } else {
+                        console.log('Directory picker cancelled by user');
                     }
                 }
             } else {
                 // Fallback for browsers without directory picker
-                await this.saveKukaFileWithPicker(datContent, `${projectName}.dat`);
-                await this.saveKukaFileWithPicker(srcContent, `${projectName}.src`);
+                console.log('Using individual file picker fallback');
+                let savedCount = 0;
+                try {
+                    await this.saveKukaFileWithPicker(datContent, `${projectName}.dat`);
+                    savedCount++;
+                    await this.saveKukaFileWithPicker(srcContent, `${projectName}.src`);
+                    savedCount++;
+                    
+                    if (savedCount === 2) {
+                        alert(`File KUKA esportati con successo!\n\n✓ ${projectName}.dat\n✓ ${projectName}.src`);
+                    }
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        console.error('Fallback export failed:', error);
+                    }
+                }
             }
             
         } catch (error) {
