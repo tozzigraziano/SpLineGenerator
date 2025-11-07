@@ -1195,10 +1195,8 @@ class SplineGenerator {
             const start = Math.min(this.lastSelectedIndex, index);
             const end = Math.max(this.lastSelectedIndex, index);
             
-            // Clear previous selection if not holding Ctrl
-            if (!e.ctrlKey) {
-                this.selectedPoints.clear();
-            }
+            // For shift selection, we always extend the current selection
+            // (don't clear unless Ctrl is explicitly held to modify behavior)
             
             // Select range
             for (let i = start; i <= end; i++) {
@@ -1316,6 +1314,18 @@ class SplineGenerator {
             }
         });
         
+        // Deselect all points after applying velocity
+        this.selectedPoints.clear();
+        
+        // Update checkboxes in table
+        document.querySelectorAll('.point-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        
+        // Update displays and graphics
+        this.updateSelectedCount();
+        this.updateTableSelection();
+        this.highlightSelectedPoints();
         this.updateSplineTable();
         this.bulkVelocityInput.value = '';
     }
