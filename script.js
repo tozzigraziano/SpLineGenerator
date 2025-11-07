@@ -583,8 +583,8 @@ class SplineGenerator {
         if (splineTable) {
             const headers = splineTable.querySelectorAll('thead th');
             if (headers.length >= 4) {
-                headers[1].textContent = `Posizione ${this.settings.xAxisLabel} (mm)`;
-                headers[2].textContent = `Posizione ${this.settings.yAxisLabel} (mm)`;
+                headers[2].textContent = `${this.settings.xAxisLabel} (mm)`;
+                headers[3].textContent = `${this.settings.yAxisLabel} (mm)`;
             }
         }
         
@@ -1462,10 +1462,10 @@ class SplineGenerator {
     updateCoordinates(worldPos, snappedPos = null) {
         if (snappedPos && this.settings.enableSnap) {
             this.coordinatesDisplay.textContent = 
-                `X: ${worldPos.x.toFixed(1)} mm → ${snappedPos.x.toFixed(1)} mm, Y: ${worldPos.y.toFixed(1)} mm → ${snappedPos.y.toFixed(1)} mm`;
+                `${this.settings.xAxisLabel}: ${worldPos.x.toFixed(1)} mm → ${snappedPos.x.toFixed(1)} mm, ${this.settings.yAxisLabel}: ${worldPos.y.toFixed(1)} mm → ${snappedPos.y.toFixed(1)} mm`;
         } else {
             this.coordinatesDisplay.textContent = 
-                `X: ${worldPos.x.toFixed(1)} mm, Y: ${worldPos.y.toFixed(1)} mm`;
+                `${this.settings.xAxisLabel}: ${worldPos.x.toFixed(1)} mm, ${this.settings.yAxisLabel}: ${worldPos.y.toFixed(1)} mm`;
         }
     }
 
