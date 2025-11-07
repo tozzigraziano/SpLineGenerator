@@ -1189,7 +1189,7 @@ class SplineGenerator {
         
         this.splinePoints.forEach((point, index) => {
             if (!point.velocity) point.velocity = 30; // Default velocity in mm/s
-            if (!point.id) point.id = index + 1;
+            point.id = index + 1; // Always update ID to match current position
             
             const row = document.createElement('tr');
             const isSelected = this.selectedPoints.has(index);
