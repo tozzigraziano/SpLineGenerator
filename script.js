@@ -79,6 +79,10 @@ class SplineGenerator {
         this.robotType = document.getElementById('robotType');
         this.exportBtn = document.getElementById('exportBtn');
         
+        // Program naming elements
+        this.programBasename = document.getElementById('programBasename');
+        this.programIndex = document.getElementById('programIndex');
+        
         // Dark mode button
         this.darkModeBtn = document.getElementById('darkModeBtn');
         
@@ -125,7 +129,9 @@ class SplineGenerator {
             splineColor: '#ff0000',
             shapeColor: '#0066cc',
             xAxisLabel: 'X',
-            yAxisLabel: 'Y'
+            yAxisLabel: 'Y',
+            basename: 'program',
+            maxProgramNum: 999
         };
         this.loadSettingsFromStorage();
         this.updateSettingsUI();
@@ -1743,16 +1749,15 @@ class SplineGenerator {
     }
 
     saveProject() {
-        // Get project name from input
-        const projectNameInput = document.getElementById('projectName');
-        const projectName = projectNameInput && projectNameInput.value.trim() 
-            ? projectNameInput.value.trim() 
-            : '';
+        // Get current program name from settings and index
+        const programIndex = this.programIndex ? this.programIndex.value : '1';
+        const programName = `${this.settings.basename}${programIndex}`;
         
         const projectData = {
             version: '1.0',
             timestamp: new Date().toISOString(),
-            projectName: projectName,
+            programName: programName,
+            programIndex: parseInt(programIndex),
             settings: this.settings,
             splinePoints: this.splinePoints,
             shapes: this.shapes
@@ -1761,16 +1766,8 @@ class SplineGenerator {
         const dataStr = JSON.stringify(projectData, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
         
-        // Determine filename
-        let fileName = 'spline-project';
-        
-        if (projectName) {
-            // Use project name specified, removing invalid characters
-            fileName = projectName.replace(/[^a-zA-Z0-9_\-]/g, '-');
-        } else {
-            // Use timestamp as fallback
-            fileName = `spline-project-${new Date().toISOString().slice(0,10)}`;
-        }
+        // Use program name as filename
+        const fileName = programName.replace(/[^a-zA-Z0-9_\-]/g, '-');
         
         const link = document.createElement('a');
         link.href = URL.createObjectURL(dataBlob);
@@ -1819,11 +1816,28 @@ class SplineGenerator {
                     this.saveSettingsToStorage();
                 }
                 
-                // Load project name if available
-                if (projectData.projectName) {
-                    const projectNameInput = document.getElementById('projectName');
-                    if (projectNameInput) {
-                        projectNameInput.value = projectData.projectName;
+                // Load program name and index if available
+                if (projectData.programName || projectData.projectName) {
+                    // Handle both new and legacy format
+                    const programName = projectData.programName || projectData.projectName;
+                    
+                    // Try to extract basename and index from program name
+                    const match = programName.match(/^(.+?)(\d+)$/);
+                    if (match) {
+                        const [, basename, index] = match;
+                        // Update settings if basename is different
+                        if (basename !== this.settings.basename) {
+                            this.settings.basename = basename;
+                        }
+                        // Set program index
+                        if (this.programIndex && parseInt(index) <= this.settings.maxProgramNum) {
+                            this.programIndex.value = index;
+                        }
+                    }
+                    
+                    // If there's a saved programIndex, use it
+                    if (projectData.programIndex && this.programIndex) {
+                        this.programIndex.value = Math.min(projectData.programIndex, this.settings.maxProgramNum);
                     }
                 }
                 
@@ -1891,6 +1905,8 @@ class SplineGenerator {
         this.settings.shapeColor = document.getElementById('shapeColor').value;
         this.settings.xAxisLabel = document.getElementById('xAxisLabel').value;
         this.settings.yAxisLabel = document.getElementById('yAxisLabel').value;
+        this.settings.basename = document.getElementById('basename').value;
+        this.settings.maxProgramNum = parseInt(document.getElementById('maxProgramNum').value);
         
         // Validate that X and Y axis labels are different
         if (this.settings.xAxisLabel === this.settings.yAxisLabel) {
@@ -1912,6 +1928,9 @@ class SplineGenerator {
             this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
         }
         
+        // Update program naming UI
+        this.updateProgramNamingUI();
+        
         this.closeSettings();
     }
 
@@ -1930,7 +1949,9 @@ class SplineGenerator {
             splineColor: '#ff0000',
             shapeColor: '#0066cc',
             xAxisLabel: 'X',
-            yAxisLabel: 'Y'
+            yAxisLabel: 'Y',
+            basename: 'program',
+            maxProgramNum: 999
         };
         this.updateSettingsUI();
         this.saveSettingsToStorage();
@@ -1956,7 +1977,9 @@ class SplineGenerator {
             'splineColor': this.settings.splineColor,
             'shapeColor': this.settings.shapeColor,
             'xAxisLabel': this.settings.xAxisLabel,
-            'yAxisLabel': this.settings.yAxisLabel
+            'yAxisLabel': this.settings.yAxisLabel,
+            'basename': this.settings.basename,
+            'maxProgramNum': this.settings.maxProgramNum
         };
         
         for (const [id, value] of Object.entries(elements)) {
@@ -1972,12 +1995,38 @@ class SplineGenerator {
             enableSnapElement.checked = this.settings.enableSnap;
         }
         
+        // Update program naming UI
+        this.updateProgramNamingUI();
+        
         const smoothingValue = document.getElementById('smoothingValue');
         if (smoothingValue) {
             smoothingValue.textContent = this.settings.splineSmoothing;
         }
         
         console.log('Settings UI updated');
+    }
+
+    updateProgramNamingUI() {
+        // Update basename display
+        if (this.programBasename) {
+            this.programBasename.textContent = this.settings.basename || 'program';
+        }
+        
+        // Update program index options
+        if (this.programIndex) {
+            const currentValue = this.programIndex.value || '1';
+            this.programIndex.innerHTML = '';
+            
+            for (let i = 1; i <= this.settings.maxProgramNum; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = i;
+                if (i.toString() === currentValue && i <= this.settings.maxProgramNum) {
+                    option.selected = true;
+                }
+                this.programIndex.appendChild(option);
+            }
+        }
     }
 
     saveSettingsToStorage() {
@@ -2513,12 +2562,12 @@ class SplineGenerator {
     }
     
     exportKukaCode() {
-        const projectNameInput = document.getElementById('projectName');
-        let projectName = 'Progetto1';
+        // Get current program name from settings and index
+        const programIndex = this.programIndex ? this.programIndex.value : '1';
+        let projectName = `${this.settings.basename}${programIndex}`;
         
-        if (projectNameInput && projectNameInput.value.trim()) {
-            projectName = projectNameInput.value.trim().replace(/[^a-zA-Z0-9_]/g, '_');
-        }
+        // Ensure valid filename for KUKA (only letters, numbers, underscore)
+        projectName = projectName.replace(/[^a-zA-Z0-9_]/g, '_');
         
         // Try to load templates, fallback to default if not available
         this.loadKukaTemplates().then(templates => {
