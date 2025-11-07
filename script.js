@@ -709,7 +709,15 @@ class SplineGenerator {
 
     // Spline functionality
     startSpline(worldPos) {
+        // Clamp coordinates to graph limits
+        worldPos = this.clampToGraphLimits(worldPos);
+        
         if (!this.isDrawing) {
+            // Clear any existing animation when starting a new spline
+            if (this.animationCtx) {
+                this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+            }
+            
             this.splinePoints = [worldPos];
             this.isDrawing = true;
             this.lastSampleTime = Date.now();
@@ -722,6 +730,9 @@ class SplineGenerator {
     }
 
     continueSampling(worldPos) {
+        // Clamp coordinates to graph limits
+        worldPos = this.clampToGraphLimits(worldPos);
+        
         const now = Date.now();
         const lastPoint = this.splinePoints[this.splinePoints.length - 1];
         const distance = Math.sqrt(
@@ -739,6 +750,13 @@ class SplineGenerator {
 
     endSpline() {
         this.isDrawing = false;
+    }
+
+    clampToGraphLimits(worldPos) {
+        return {
+            x: Math.max(this.settings.minX, Math.min(this.settings.maxX, worldPos.x)),
+            y: Math.max(this.settings.minY, Math.min(this.settings.maxY, worldPos.y))
+        };
     }
 
     drawSpline() {
@@ -796,6 +814,9 @@ class SplineGenerator {
 
     // Shape functionality
     startShape(worldPos) {
+        // Clamp coordinates to graph limits
+        worldPos = this.clampToGraphLimits(worldPos);
+        
         this.tempShape = {
             type: this.currentTool,
             start: worldPos,
@@ -806,6 +827,9 @@ class SplineGenerator {
     updateShapePreview(worldPos) {
         if (!this.tempShape) return;
         
+        // Clamp coordinates to graph limits
+        worldPos = this.clampToGraphLimits(worldPos);
+        
         this.tempShape.end = worldPos;
         this.redrawShapes();
         this.drawShapePreview();
@@ -813,6 +837,9 @@ class SplineGenerator {
 
     finishShape(worldPos) {
         if (!this.tempShape) return;
+        
+        // Clamp coordinates to graph limits
+        worldPos = this.clampToGraphLimits(worldPos);
         
         this.tempShape.end = worldPos;
         this.shapes.push({ ...this.tempShape });
