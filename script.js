@@ -346,12 +346,21 @@ class SplineGenerator {
         // Use the smaller scale to ensure 1:1 aspect ratio (square pixels)
         const scale = Math.min(scaleX, scaleY);
         
+        // Calculate the actual used dimensions with uniform scale
+        const usedWidth = totalRangeX * scale;
+        const usedHeight = totalRangeY * scale;
+        
+        // Center the content in the canvas
+        const offsetX = (this.canvasWidth - usedWidth) / 2;
+        const offsetY = (this.canvasHeight - usedHeight) / 2;
+        
         console.log(`Original scales: ${scaleX.toFixed(2)}px/mm (X), ${scaleY.toFixed(2)}px/mm (Y)`);
         console.log(`Uniform scale: ${scale.toFixed(2)}px/mm`);
+        console.log(`Offset: X=${offsetX.toFixed(1)}px, Y=${offsetY.toFixed(1)}px`);
         
-        // Calculate position of X=0 and Y=0 axes with uniform scale
-        const zeroX = (0 - this.settings.minX) * scale;
-        const zeroY = this.canvasHeight - (0 - this.settings.minY) * scale;
+        // Calculate position of X=0 and Y=0 axes with uniform scale and centering
+        const zeroX = offsetX + (0 - this.settings.minX) * scale;
+        const zeroY = offsetY + (this.settings.maxY - 0) * scale;
         
         // Secondary grid lines (fine grid)
         this.gridCtx.strokeStyle = '#e8e8e8';
@@ -360,16 +369,16 @@ class SplineGenerator {
         
         // Vertical lines
         for (let x = this.settings.minX; x <= this.settings.maxX; x += this.settings.gridSize) {
-            const canvasX = (x - this.settings.minX) * scale;
-            this.gridCtx.moveTo(canvasX, 0);
-            this.gridCtx.lineTo(canvasX, this.canvasHeight);
+            const canvasX = offsetX + (x - this.settings.minX) * scale;
+            this.gridCtx.moveTo(canvasX, offsetY);
+            this.gridCtx.lineTo(canvasX, offsetY + usedHeight);
         }
         
         // Horizontal lines  
         for (let y = this.settings.minY; y <= this.settings.maxY; y += this.settings.gridSize) {
-            const canvasY = this.canvasHeight - (y - this.settings.minY) * scale;
-            this.gridCtx.moveTo(0, canvasY);
-            this.gridCtx.lineTo(this.canvasWidth, canvasY);
+            const canvasY = offsetY + (this.settings.maxY - y) * scale;
+            this.gridCtx.moveTo(offsetX, canvasY);
+            this.gridCtx.lineTo(offsetX + usedWidth, canvasY);
         }
         
         this.gridCtx.stroke();
@@ -383,18 +392,18 @@ class SplineGenerator {
         // Major vertical lines
         for (let x = this.settings.minX; x <= this.settings.maxX; x += majorStep) {
             if (x % majorStep === 0) {
-                const canvasX = (x - this.settings.minX) * scale;
-                this.gridCtx.moveTo(canvasX, 0);
-                this.gridCtx.lineTo(canvasX, this.canvasHeight);
+                const canvasX = offsetX + (x - this.settings.minX) * scale;
+                this.gridCtx.moveTo(canvasX, offsetY);
+                this.gridCtx.lineTo(canvasX, offsetY + usedHeight);
             }
         }
         
         // Major horizontal lines
         for (let y = this.settings.minY; y <= this.settings.maxY; y += majorStep) {
             if (y % majorStep === 0) {
-                const canvasY = this.canvasHeight - (y - this.settings.minY) * scale;
-                this.gridCtx.moveTo(0, canvasY);
-                this.gridCtx.lineTo(this.canvasWidth, canvasY);
+                const canvasY = offsetY + (this.settings.maxY - y) * scale;
+                this.gridCtx.moveTo(offsetX, canvasY);
+                this.gridCtx.lineTo(offsetX + usedWidth, canvasY);
             }
         }
         
@@ -407,25 +416,25 @@ class SplineGenerator {
         
         // Y axis (X=0) - draw only if X=0 is within range
         if (0 >= this.settings.minX && 0 <= this.settings.maxX) {
-            this.gridCtx.moveTo(zeroX, 0);
-            this.gridCtx.lineTo(zeroX, this.canvasHeight);
+            this.gridCtx.moveTo(zeroX, offsetY);
+            this.gridCtx.lineTo(zeroX, offsetY + usedHeight);
         }
         
         // X axis (Y=0) - draw only if Y=0 is within range
         if (0 >= this.settings.minY && 0 <= this.settings.maxY) {
-            this.gridCtx.moveTo(0, zeroY);
-            this.gridCtx.lineTo(this.canvasWidth, zeroY);
+            this.gridCtx.moveTo(offsetX, zeroY);
+            this.gridCtx.lineTo(offsetX + usedWidth, zeroY);
         }
         
         this.gridCtx.stroke();
         
         // Draw labels for both minor and major grid lines
-        this.drawGridLabels(scale, scale, zeroX, zeroY);
+        this.drawGridLabels(scale, scale, zeroX, zeroY, offsetX, offsetY, usedWidth, usedHeight);
         
         console.log('Grid drawing completed');
     }
     
-    drawGridLabels(scaleX, scaleY, zeroX, zeroY) {
+    drawGridLabels(scaleX, scaleY, zeroX, zeroY, offsetX, offsetY, usedWidth, usedHeight) {
         // Set up text style
         this.gridCtx.fillStyle = '#666666';
         this.gridCtx.font = '11px Arial';
@@ -436,15 +445,15 @@ class SplineGenerator {
         
         for (let x = this.settings.minX; x <= this.settings.maxX; x += this.settings.gridSize) {
             if (x !== 0) { // Skip zero, we'll handle it separately
-                const canvasX = (x - this.settings.minX) * scaleX;
+                const canvasX = offsetX + (x - this.settings.minX) * scaleX;
                 let labelY;
                 
                 if (0 >= this.settings.minY && 0 <= this.settings.maxY) {
                     // Zero line is visible, place labels on it
                     labelY = zeroY + 4;
                 } else {
-                    // Zero line not visible, place at bottom
-                    labelY = this.canvasHeight - 15;
+                    // Zero line not visible, place at bottom of used area
+                    labelY = offsetY + usedHeight - 15;
                 }
                 
                 // Major labels (darker, with "mm")
@@ -467,15 +476,15 @@ class SplineGenerator {
         
         for (let y = this.settings.minY; y <= this.settings.maxY; y += this.settings.gridSize) {
             if (y !== 0) { // Skip zero, we'll handle it separately
-                const canvasY = this.canvasHeight - (y - this.settings.minY) * scaleY;
+                const canvasY = offsetY + (this.settings.maxY - y) * scaleY;
                 let labelX;
                 
                 if (0 >= this.settings.minX && 0 <= this.settings.maxX) {
                     // Zero line is visible, place labels on it
                     labelX = zeroX - 4;
                 } else {
-                    // Zero line not visible, place at left
-                    labelX = this.canvasWidth - 4;
+                    // Zero line not visible, place at left of used area
+                    labelX = offsetX - 4;
                 }
                 
                 // Major labels (darker, with "mm")
@@ -586,8 +595,16 @@ class SplineGenerator {
         // Use uniform scale to maintain 1:1 aspect ratio
         const scale = Math.min(scaleX, scaleY);
         
-        const worldX = this.settings.minX + (canvasX / scale);
-        const worldY = this.settings.maxY - (canvasY / scale);
+        // Calculate the actual used dimensions with uniform scale
+        const usedWidth = totalRangeX * scale;
+        const usedHeight = totalRangeY * scale;
+        
+        // Center the content in the canvas
+        const offsetX = (this.canvasWidth - usedWidth) / 2;
+        const offsetY = (this.canvasHeight - usedHeight) / 2;
+        
+        const worldX = this.settings.minX + ((canvasX - offsetX) / scale);
+        const worldY = this.settings.maxY - ((canvasY - offsetY) / scale);
         
         return { x: worldX, y: worldY };
     }
@@ -601,8 +618,16 @@ class SplineGenerator {
         // Use uniform scale to maintain 1:1 aspect ratio
         const scale = Math.min(scaleX, scaleY);
         
-        const canvasX = (worldX - this.settings.minX) * scale;
-        const canvasY = (this.settings.maxY - worldY) * scale;
+        // Calculate the actual used dimensions with uniform scale
+        const usedWidth = totalRangeX * scale;
+        const usedHeight = totalRangeY * scale;
+        
+        // Center the content in the canvas
+        const offsetX = (this.canvasWidth - usedWidth) / 2;
+        const offsetY = (this.canvasHeight - usedHeight) / 2;
+        
+        const canvasX = offsetX + (worldX - this.settings.minX) * scale;
+        const canvasY = offsetY + (this.settings.maxY - worldY) * scale;
         
         return { x: canvasX, y: canvasY };
     }
@@ -1557,6 +1582,22 @@ class SplineGenerator {
         this.settingsModal.style.display = 'none';
     }
 
+    updateCanvasScaling() {
+        // Clear all canvases to ensure clean redraw
+        if (this.gridCtx) {
+            this.gridCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        }
+        if (this.shapeCtx) {
+            this.shapeCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        }
+        if (this.splineCtx) {
+            this.splineCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        }
+        if (this.animationCtx) {
+            this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        }
+    }
+
     saveSettings() {
         this.settings.minX = parseInt(document.getElementById('minX').value);
         this.settings.maxX = parseInt(document.getElementById('maxX').value);
@@ -1579,11 +1620,20 @@ class SplineGenerator {
             return;
         }
         
+        // Update canvas dimensions and scaling for new ranges
+        this.updateCanvasScaling();
+        
         this.saveSettingsToStorage();
         this.drawGrid();
         this.updateTableHeaders();
         this.redrawShapes();
         this.drawSpline();
+        
+        // Clear and redraw animation if any spline exists
+        if (this.animationCtx) {
+            this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        }
+        
         this.closeSettings();
     }
 
