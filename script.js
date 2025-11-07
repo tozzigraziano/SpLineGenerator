@@ -185,17 +185,29 @@ class SplineGenerator {
         // Tool selection
         if (this.toolButtons) {
             this.toolButtons.forEach(btn => {
-                btn.addEventListener('click', (e) => this.selectTool(e.target.dataset.tool));
+                btn.addEventListener('click', (e) => {
+                    // Find the button element (might be clicked on the icon inside)
+                    const button = e.target.closest('.tool-btn');
+                    if (button) {
+                        this.selectTool(button.dataset.tool);
+                    }
+                });
             });
         }
         
         // File buttons
         if (this.saveBtn) {
-            this.saveBtn.addEventListener('click', () => this.saveProject());
+            this.saveBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.saveProject();
+            });
         }
         
         if (this.loadBtn) {
-            this.loadBtn.addEventListener('click', () => this.fileInput.click());
+            this.loadBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.fileInput.click();
+            });
         }
         
         if (this.fileInput) {

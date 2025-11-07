@@ -749,3 +749,46 @@ main {
         gap: 10px;
     }
 }
+
+/* Material Symbols styles */
+.material-symbols-outlined {
+  font-variation-settings:
+  'FILL' 0,
+  'wght' 400,
+  'GRAD' 0,
+  'opsz' 24
+}
+
+/* Tool button specific styles */
+.tool-btn {
+    min-width: 40px;
+    min-height: 36px;
+    padding: 4px 8px !important;
+    font-size: 16px !important;
+    font-weight: bold;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tool-btn[data-tool="select"] {
+    font-size: 20px !important;
+}
+
+.tool-btn[data-tool="select"] .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.tool-btn[data-tool="spline"] .material-symbols-outlined,
+.tool-btn[data-tool="rectangle"] .material-symbols-outlined,
+.tool-btn[data-tool="circle"] .material-symbols-outlined {
+    font-size: 18px;
+}
+
+/* File buttons icons */
+.btn .material-symbols-outlined {
+    vertical-align: middle;
+    margin-right: 4px;
+    font-size: 16px;
+}
