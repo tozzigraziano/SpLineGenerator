@@ -85,6 +85,7 @@ class SplineGenerator {
         this.pointCountDisplay = document.getElementById('pointCount');
         this.selectedCountDisplay = document.getElementById('selectedCount');
         this.shapesCountDisplay = document.getElementById('shapesCount');
+        this.splineLengthDisplay = document.getElementById('splineLength');
         
         console.log('Elements initialized successfully');
     }
@@ -947,6 +948,7 @@ class SplineGenerator {
         
         this.updatePointCount();
         this.updateSelectedCount();
+        this.updateSplineLength();
         this.highlightSelectedPoints();
     }
 
@@ -954,6 +956,14 @@ class SplineGenerator {
         const pointCountElement = document.getElementById('pointCount');
         if (pointCountElement) {
             pointCountElement.textContent = `${this.splinePoints.length} punti`;
+        }
+    }
+
+    updateSplineLength() {
+        const splineLengthElement = document.getElementById('splineLength');
+        if (splineLengthElement) {
+            const length = this.splinePoints.length >= 2 ? this.calculateSplineLength() : 0;
+            splineLengthElement.textContent = `Lunghezza: ${length.toFixed(1)} mm`;
         }
     }
 
@@ -1405,8 +1415,14 @@ class SplineGenerator {
             this.selectedPoints.clear();
             this.lastSelectedIndex = null;
             
+            // Stop any running animation
+            this.stopAnimation();
+            
             // Clear the spline canvas
             this.splineCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+            
+            // Clear the animation canvas
+            this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
             
             this.updateSplineTable();
         }
@@ -1774,7 +1790,8 @@ class SplineGenerator {
         this.isAnimating = true;
         
         if (!this.isPaused) {
-            // Starting fresh animation
+            // Starting fresh animation - clear previous animation
+            this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
             this.animationProgress = 0;
             this.totalAnimationTime = this.calculateTotalAnimationTime();
             this.pausedTime = 0;
@@ -1860,8 +1877,19 @@ class SplineGenerator {
         if (elapsedTime < this.totalAnimationTime) {
             this.animationRequestId = requestAnimationFrame(() => this.animate());
         } else {
-            // Animation finished
-            this.stopAnimation();
+            // Animation finished - show complete spline and final position
+            this.isAnimating = false;
+            
+            // Draw complete animated spline
+            if (this.splinePoints.length >= 2) {
+                this.drawAnimatedSpline(this.splinePoints.length - 2, 1);
+                const lastPoint = this.splinePoints[this.splinePoints.length - 1];
+                this.drawPositionIndicator(lastPoint.x, lastPoint.y);
+            }
+            
+            // Update button visibility but keep the animation displayed
+            this.playBtn.style.display = 'inline-block';
+            this.pauseBtn.style.display = 'none';
         }
     }
     
