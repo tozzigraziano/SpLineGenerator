@@ -750,15 +750,6 @@ main {
     }
 }
 
-/* Material Symbols styles */
-.material-symbols-outlined {
-  font-variation-settings:
-  'FILL' 0,
-  'wght' 400,
-  'GRAD' 0,
-  'opsz' 24
-}
-
 /* Tool button specific styles */
 .tool-btn {
     min-width: 40px;
