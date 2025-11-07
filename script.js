@@ -2907,6 +2907,9 @@ class SplineGenerator {
     }
     
     async exportKukaCode() {
+        // Save current path before exporting
+        this.saveCurrentPathToIndex();
+        
         // Get current program name from settings and index
         const programIndex = this.programIndex ? this.programIndex.value : '1';
         let projectName = `${this.settings.basename}${programIndex}`;
@@ -2929,92 +2932,102 @@ class SplineGenerator {
             const datContent = this.generateKukaDatFromTemplate(projectName, templates.dat);
             const srcContent = this.generateKukaSrcFromTemplate(projectName, templates.src);
             
-            // Try using File System Access API for directory selection
-            if ('showDirectoryPicker' in window) {
-                try {
-                    // Always show directory picker (no caching of previous selection)
-                    const directoryHandle = await window.showDirectoryPicker();
-                    
-                    // Check if files already exist and confirm overwrite
-                    let shouldProceed = true;
-                    try {
-                        await directoryHandle.getFileHandle(`${projectName}.dat`);
-                        shouldProceed = confirm(`Il file ${projectName}.dat esiste già. Vuoi sovrascriverlo?`);
-                    } catch (e) {
-                        // File doesn't exist, proceed
-                    }
-                    
-                    if (!shouldProceed) {
-                        return; // User cancelled overwrite
-                    }
-                    
-                    // Save .dat file
-                    const datFileHandle = await directoryHandle.getFileHandle(`${projectName}.dat`, { create: true });
-                    const datWritable = await datFileHandle.createWritable();
-                    await datWritable.write(datContent);
-                    await datWritable.close();
-                    
-                    // Save .src file
-                    const srcFileHandle = await directoryHandle.getFileHandle(`${projectName}.src`, { create: true });
-                    const srcWritable = await srcFileHandle.createWritable();
-                    await srcWritable.write(srcContent);
-                    await srcWritable.close();
-                    
-                    console.log('KUKA files exported to selected directory:', `${projectName}.dat`, `${projectName}.src`);
-                    
-                    // Show success message with directory name if available
-                    let directoryName = 'directory selezionata';
-                    if (directoryHandle.name) {
-                        directoryName = directoryHandle.name;
-                    }
-                    alert(`File KUKA esportati con successo in "${directoryName}"!\n\n✓ ${projectName}.dat\n✓ ${projectName}.src`);
-                    
-                } catch (error) {
-                    if (error.name !== 'AbortError') {
-                        console.log('Directory picker failed, falling back to individual file saves');
-                        // Fallback to individual file saves
-                        let savedCount = 0;
-                        try {
-                            await this.saveKukaFileWithPicker(datContent, `${projectName}.dat`);
-                            savedCount++;
-                            await this.saveKukaFileWithPicker(srcContent, `${projectName}.src`);
-                            savedCount++;
-                            
-                            if (savedCount === 2) {
-                                alert(`File KUKA esportati con successo (modalità singola)!\n\n✓ ${projectName}.dat\n✓ ${projectName}.src`);
-                            }
-                        } catch (fallbackError) {
-                            if (fallbackError.name !== 'AbortError') {
-                                console.error('Complete fallback failed:', fallbackError);
-                            }
-                        }
-                    } else {
-                        console.log('Directory picker cancelled by user');
-                    }
-                }
-            } else {
-                // Fallback for browsers without directory picker
-                console.log('Using individual file picker fallback');
-                let savedCount = 0;
-                try {
-                    await this.saveKukaFileWithPicker(datContent, `${projectName}.dat`);
-                    savedCount++;
-                    await this.saveKukaFileWithPicker(srcContent, `${projectName}.src`);
-                    savedCount++;
-                    
-                    if (savedCount === 2) {
-                        alert(`File KUKA esportati con successo!\n\n✓ ${projectName}.dat\n✓ ${projectName}.src`);
-                    }
-                } catch (error) {
-                    if (error.name !== 'AbortError') {
-                        console.error('Fallback export failed:', error);
-                    }
-                }
-            }
+            // Generate project JSON
+            const timestamp = this.generateTimestamp();
+            const projectData = {
+                version: "2.0",
+                timestamp: timestamp,
+                settings: this.settings,
+                programPaths: this.programPaths,
+                currentProgramIndex: this.currentProgramIndex
+            };
+            const projectContent = JSON.stringify(projectData, null, 2);
+            
+            // Create ZIP file using JSZip
+            await this.createAndDownloadZip(projectName, datContent, srcContent, projectContent, timestamp);
             
         } catch (error) {
             console.error('Error during KUKA export:', error);
             alert('Errore durante l\'esportazione: ' + error.message);
+        }
+    }
+
+    async createAndDownloadZip(projectName, datContent, srcContent, projectContent, timestamp) {
+        try {
+            // Check if JSZip is available
+            if (typeof JSZip === 'undefined') {
+                // Fallback to individual files if JSZip is not available
+                await this.fallbackToIndividualFiles(projectName, datContent, srcContent, projectContent);
+                return;
+            }
+
+            const zip = new JSZip();
+            
+            // Add files to ZIP
+            zip.file(`${projectName}.dat`, datContent);
+            zip.file(`${projectName}.src`, srcContent);
+            zip.file(`${projectName}_project_${timestamp}.json`, projectContent);
+            
+            // Generate ZIP blob
+            const zipBlob = await zip.generateAsync({type: "blob"});
+            
+            // Try using File System Access API for save dialog
+            if ('showSaveFilePicker' in window) {
+                try {
+                    const fileHandle = await window.showSaveFilePicker({
+                        suggestedName: `${projectName}_robot_export_${timestamp}.zip`,
+                        types: [{
+                            description: 'ZIP archives',
+                            accept: { 'application/zip': ['.zip'] }
+                        }]
+                    });
+                    
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(zipBlob);
+                    await writable.close();
+                    
+                    alert(`Esportazione robot completata!\n\n📦 ${projectName}_robot_export_${timestamp}.zip\n\nContiene:\n✓ ${projectName}.dat\n✓ ${projectName}.src\n✓ ${projectName}_project_${timestamp}.json`);
+                    
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        // Fallback to download
+                        this.downloadFile(zipBlob, `${projectName}_robot_export_${timestamp}.zip`, 'application/zip');
+                        alert(`File ZIP scaricato!\n\n📦 ${projectName}_robot_export_${timestamp}.zip`);
+                    }
+                }
+            } else {
+                // Fallback to download
+                this.downloadFile(zipBlob, `${projectName}_robot_export_${timestamp}.zip`, 'application/zip');
+                alert(`File ZIP scaricato!\n\n📦 ${projectName}_robot_export_${timestamp}.zip`);
+            }
+            
+        } catch (error) {
+            console.error('Error creating ZIP:', error);
+            // Fallback to individual files
+            await this.fallbackToIndividualFiles(projectName, datContent, srcContent, projectContent);
+        }
+    }
+
+    async fallbackToIndividualFiles(projectName, datContent, srcContent, projectContent) {
+        try {
+            const timestamp = this.generateTimestamp();
+            let savedCount = 0;
+            
+            await this.saveKukaFileWithPicker(datContent, `${projectName}.dat`);
+            savedCount++;
+            await this.saveKukaFileWithPicker(srcContent, `${projectName}.src`);
+            savedCount++;
+            
+            // Also save project file
+            this.downloadFile(projectContent, `${projectName}_project_${timestamp}.json`, 'application/json');
+            savedCount++;
+            
+            if (savedCount === 3) {
+                alert(`File esportati separatamente!\n\n✓ ${projectName}.dat\n✓ ${projectName}.src\n✓ ${projectName}_project_${timestamp}.json`);
+            }
+        } catch (error) {
+            console.error('Fallback to individual files failed:', error);
+            alert('Errore durante l\'esportazione dei file individuali');
         }
     }
 
