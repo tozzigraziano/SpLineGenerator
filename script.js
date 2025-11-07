@@ -1868,38 +1868,166 @@ class SplineGenerator {
     calculateAnimationPosition(elapsedTime) {
         if (this.splinePoints.length < 2) return null;
         
-        let currentTime = 0;
+        // Calculate total spline length for proper timing
+        const totalSplineLength = this.calculateSplineLength();
         
+        // Calculate how far along the spline we should be based on time
+        let currentTime = 0;
+        let targetDistance = 0;
+        
+        // First, find the target distance based on elapsed time
         for (let i = 0; i < this.splinePoints.length - 1; i++) {
             const p1 = this.splinePoints[i];
-            const p2 = this.splinePoints[i + 1];
-            
-            const distance = Math.sqrt(
-                Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
-            );
-            
             const velocity = p1.velocity || 30; // mm/s
-            const segmentTime = (distance / velocity) * 1000; // milliseconds
+            const segmentLength = this.calculateSplineSegmentLength(i);
+            const segmentTime = (segmentLength / velocity) * 1000; // milliseconds
             
             if (elapsedTime <= currentTime + segmentTime) {
-                // Current position is in this segment
                 const segmentProgress = (elapsedTime - currentTime) / segmentTime;
-                
-                const x = p1.x + (p2.x - p1.x) * segmentProgress;
-                const y = p1.y + (p2.y - p1.y) * segmentProgress;
+                targetDistance += segmentLength * segmentProgress;
+                break;
+            }
+            
+            currentTime += segmentTime;
+            targetDistance += segmentLength;
+        }
+        
+        // Now find the position at the target distance along the spline
+        return this.getPositionAtDistance(targetDistance);
+    }
+    
+    calculateSplineLength() {
+        if (this.splinePoints.length < 2) return 0;
+        
+        let totalLength = 0;
+        for (let i = 0; i < this.splinePoints.length - 1; i++) {
+            totalLength += this.calculateSplineSegmentLength(i);
+        }
+        return totalLength;
+    }
+    
+    calculateSplineSegmentLength(segmentIndex) {
+        if (segmentIndex >= this.splinePoints.length - 1) return 0;
+        
+        const p1 = this.splinePoints[segmentIndex];
+        const p2 = this.splinePoints[segmentIndex + 1];
+        
+        if (this.splinePoints.length === 2) {
+            // Simple line distance
+            return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+        }
+        
+        // For spline segments, approximate length by sampling the curve
+        const samples = 20;
+        let length = 0;
+        let prevPoint = this.getSplinePointAt(segmentIndex, 0);
+        
+        for (let i = 1; i <= samples; i++) {
+            const t = i / samples;
+            const currentPoint = this.getSplinePointAt(segmentIndex, t);
+            length += Math.sqrt(
+                Math.pow(currentPoint.x - prevPoint.x, 2) + 
+                Math.pow(currentPoint.y - prevPoint.y, 2)
+            );
+            prevPoint = currentPoint;
+        }
+        
+        return length;
+    }
+    
+    getSplinePointAt(segmentIndex, t) {
+        if (this.splinePoints.length === 2) {
+            // Linear interpolation for 2 points
+            const p1 = this.splinePoints[0];
+            const p2 = this.splinePoints[1];
+            return {
+                x: p1.x + (p2.x - p1.x) * t,
+                y: p1.y + (p2.y - p1.y) * t
+            };
+        }
+        
+        // Bezier curve calculation for spline segments
+        const i = segmentIndex;
+        const points = this.splinePoints;
+        
+        if (i === 0) {
+            // First segment
+            const p0 = points[0];
+            const p1 = points[1];
+            const p2 = points[2] || points[1];
+            
+            const cp1x = p0.x + (p1.x - p0.x) * this.settings.splineSmoothing * 0.2;
+            const cp1y = p0.y + (p1.y - p0.y) * this.settings.splineSmoothing * 0.2;
+            const cp2x = p1.x - (p2.x - p0.x) * this.settings.splineSmoothing * 0.2;
+            const cp2y = p1.y - (p2.y - p0.y) * this.settings.splineSmoothing * 0.2;
+            
+            return this.bezierPoint(p0, {x: cp1x, y: cp1y}, {x: cp2x, y: cp2y}, p1, t);
+        } else if (i >= points.length - 2) {
+            // Last segment
+            const p0 = points[i - 1] || points[i];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            
+            const cp1x = p1.x + (p2.x - p0.x) * this.settings.splineSmoothing * 0.2;
+            const cp1y = p1.y + (p2.y - p0.y) * this.settings.splineSmoothing * 0.2;
+            const cp2x = p2.x - (p2.x - p1.x) * this.settings.splineSmoothing * 0.2;
+            const cp2y = p2.y - (p2.y - p1.y) * this.settings.splineSmoothing * 0.2;
+            
+            return this.bezierPoint(p1, {x: cp1x, y: cp1y}, {x: cp2x, y: cp2y}, p2, t);
+        } else {
+            // Middle segments
+            const p0 = points[i - 1];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const p3 = points[i + 2];
+            
+            const cp1x = p1.x + (p2.x - p0.x) * this.settings.splineSmoothing * 0.2;
+            const cp1y = p1.y + (p2.y - p0.y) * this.settings.splineSmoothing * 0.2;
+            const cp2x = p2.x - (p3.x - p1.x) * this.settings.splineSmoothing * 0.2;
+            const cp2y = p2.y - (p3.y - p1.y) * this.settings.splineSmoothing * 0.2;
+            
+            return this.bezierPoint(p1, {x: cp1x, y: cp1y}, {x: cp2x, y: cp2y}, p2, t);
+        }
+    }
+    
+    bezierPoint(p0, p1, p2, p3, t) {
+        const u = 1 - t;
+        const tt = t * t;
+        const uu = u * u;
+        const uuu = uu * u;
+        const ttt = tt * t;
+        
+        return {
+            x: uuu * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + ttt * p3.x,
+            y: uuu * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + ttt * p3.y
+        };
+    }
+    
+    getPositionAtDistance(targetDistance) {
+        if (this.splinePoints.length < 2) return null;
+        
+        let currentDistance = 0;
+        
+        for (let i = 0; i < this.splinePoints.length - 1; i++) {
+            const segmentLength = this.calculateSplineSegmentLength(i);
+            
+            if (currentDistance + segmentLength >= targetDistance) {
+                // Target is in this segment
+                const segmentProgress = (targetDistance - currentDistance) / segmentLength;
+                const position = this.getSplinePointAt(i, segmentProgress);
                 
                 return {
-                    x: x,
-                    y: y,
+                    x: position.x,
+                    y: position.y,
                     segmentIndex: i,
                     progress: segmentProgress
                 };
             }
             
-            currentTime += segmentTime;
+            currentDistance += segmentLength;
         }
         
-        // Return last point if beyond animation time
+        // Return last point if beyond total distance
         const lastPoint = this.splinePoints[this.splinePoints.length - 1];
         return {
             x: lastPoint.x,
@@ -1919,24 +2047,10 @@ class SplineGenerator {
         
         this.animationCtx.beginPath();
         
-        // Draw completed segments
-        for (let i = 0; i < currentSegmentIndex; i++) {
-            const p1 = this.splinePoints[i];
-            const p2 = this.splinePoints[i + 1];
-            
-            const screenP1 = this.worldToScreen(p1.x, p1.y);
-            const screenP2 = this.worldToScreen(p2.x, p2.y);
-            
-            if (i === 0) {
-                this.animationCtx.moveTo(screenP1.x, screenP1.y);
-            }
-            this.animationCtx.lineTo(screenP2.x, screenP2.y);
-        }
-        
-        // Draw partial current segment
-        if (currentSegmentIndex < this.splinePoints.length - 1) {
-            const p1 = this.splinePoints[currentSegmentIndex];
-            const p2 = this.splinePoints[currentSegmentIndex + 1];
+        if (this.splinePoints.length === 2) {
+            // Simple line for two points
+            const p1 = this.splinePoints[0];
+            const p2 = this.splinePoints[1];
             
             const currentX = p1.x + (p2.x - p1.x) * segmentProgress;
             const currentY = p1.y + (p2.y - p1.y) * segmentProgress;
@@ -1944,10 +2058,52 @@ class SplineGenerator {
             const screenP1 = this.worldToScreen(p1.x, p1.y);
             const screenCurrent = this.worldToScreen(currentX, currentY);
             
-            if (currentSegmentIndex === 0 && this.splinePoints.length === 2) {
-                this.animationCtx.moveTo(screenP1.x, screenP1.y);
-            }
+            this.animationCtx.moveTo(screenP1.x, screenP1.y);
             this.animationCtx.lineTo(screenCurrent.x, screenCurrent.y);
+        } else {
+            // Draw smooth spline up to current position
+            const points = this.splinePoints.map(p => this.worldToScreen(p.x, p.y));
+            
+            this.animationCtx.moveTo(points[0].x, points[0].y);
+            
+            // Draw completed segments
+            for (let i = 1; i < Math.min(currentSegmentIndex + 1, points.length - 1); i++) {
+                const cp1x = points[i].x + (points[i + 1].x - points[i - 1].x) * this.settings.splineSmoothing * 0.2;
+                const cp1y = points[i].y + (points[i + 1].y - points[i - 1].y) * this.settings.splineSmoothing * 0.2;
+                const cp2x = points[i + 1].x - (points[i + 2] ? points[i + 2].x - points[i].x : 0) * this.settings.splineSmoothing * 0.2;
+                const cp2y = points[i + 1].y - (points[i + 2] ? points[i + 2].y - points[i].y : 0) * this.settings.splineSmoothing * 0.2;
+                
+                if (i <= currentSegmentIndex) {
+                    // Complete segment
+                    this.animationCtx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, points[i + 1].x, points[i + 1].y);
+                }
+            }
+            
+            // Draw partial current segment if needed
+            if (currentSegmentIndex < this.splinePoints.length - 1 && segmentProgress > 0) {
+                const currentPoint = this.getSplinePointAt(currentSegmentIndex, segmentProgress);
+                const screenCurrent = this.worldToScreen(currentPoint.x, currentPoint.y);
+                
+                // Draw curve up to current position
+                const i = currentSegmentIndex + 1;
+                if (i < points.length - 1) {
+                    const cp1x = points[i].x + (points[i + 1].x - points[i - 1].x) * this.settings.splineSmoothing * 0.2;
+                    const cp1y = points[i].y + (points[i + 1].y - points[i - 1].y) * this.settings.splineSmoothing * 0.2;
+                    const cp2x = points[i + 1].x - (points[i + 2] ? points[i + 2].x - points[i].x : 0) * this.settings.splineSmoothing * 0.2;
+                    const cp2y = points[i + 1].y - (points[i + 2] ? points[i + 2].y - points[i].y : 0) * this.settings.splineSmoothing * 0.2;
+                    
+                    // Sample the bezier curve up to the current progress
+                    const samples = Math.ceil(segmentProgress * 20);
+                    for (let s = 1; s <= samples; s++) {
+                        const t = (s / 20) / segmentProgress;
+                        if (t > 1) break;
+                        
+                        const samplePoint = this.getSplinePointAt(currentSegmentIndex, t * segmentProgress);
+                        const screenSample = this.worldToScreen(samplePoint.x, samplePoint.y);
+                        this.animationCtx.lineTo(screenSample.x, screenSample.y);
+                    }
+                }
+            }
         }
         
         this.animationCtx.stroke();
