@@ -16,6 +16,7 @@ Questa cartella contiene i font Material Symbols scaricati localmente per garant
 - `save` - Salva progetto
 - `folder_open` - Carica progetto
 - `settings` - Impostazioni
+- `dark_mode` / `light_mode` - Toggle modalità scura/chiara
 
 ## Vantaggi della soluzione locale:
 

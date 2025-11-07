@@ -33,6 +33,8 @@ class SplineGenerator {
         setTimeout(() => {
             this.drawGrid();
             this.updateTableHeaders();
+            this.loadDarkModePreference();
+            console.log('Grid drawn and dark mode loaded');
             console.log('Grid drawn');
         }, 100);
     }
@@ -77,6 +79,9 @@ class SplineGenerator {
         this.robotType = document.getElementById('robotType');
         this.exportBtn = document.getElementById('exportBtn');
         
+        // Dark mode button
+        this.darkModeBtn = document.getElementById('darkModeBtn');
+        
         // Side panel elements
         this.tabButtons = document.querySelectorAll('.tab-btn');
         this.splineTableBody = document.getElementById('splineTableBody');
@@ -90,6 +95,19 @@ class SplineGenerator {
         this.splineLengthDisplay = document.getElementById('splineLength');
         
         console.log('Elements initialized successfully');
+    }
+
+    // Get theme colors
+    getThemeColors() {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        return {
+            canvasBg: isDark ? '#1e1e1e' : '#ffffff',
+            gridColor: isDark ? '#404040' : '#e8e8e8',
+            axisColor: isDark ? '#606060' : '#333333',
+            textColor: isDark ? '#e0e0e0' : '#333333',
+            pointBorder: isDark ? '#e0e0e0' : '#333',
+            pointFill: isDark ? '#404040' : 'white'
+        };
     }
 
     initializeSettings() {
@@ -212,6 +230,11 @@ class SplineGenerator {
         
         if (this.fileInput) {
             this.fileInput.addEventListener('change', (e) => this.loadProject(e));
+        }
+        
+        // Dark mode toggle
+        if (this.darkModeBtn) {
+            this.darkModeBtn.addEventListener('click', () => this.toggleDarkMode());
         }
         
         // Clear buttons
@@ -366,9 +389,10 @@ class SplineGenerator {
             return;
         }
         
-        // Clear canvas with white background
+        // Clear canvas with theme background
+        const themeColors = this.getThemeColors();
         this.gridCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
-        this.gridCtx.fillStyle = '#ffffff';
+        this.gridCtx.fillStyle = themeColors.canvasBg;
         this.gridCtx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
         
         // Calculate scale: how many pixels per mm
@@ -397,7 +421,7 @@ class SplineGenerator {
         const zeroY = offsetY + (this.settings.maxY - 0) * scale;
         
         // Secondary grid lines (fine grid)
-        this.gridCtx.strokeStyle = '#e8e8e8';
+        this.gridCtx.strokeStyle = themeColors.gridColor;
         this.gridCtx.lineWidth = 0.5;
         this.gridCtx.beginPath();
         
@@ -419,7 +443,7 @@ class SplineGenerator {
         
         // Major grid lines (every 5 grid units)
         const majorStep = this.settings.gridSize * 5;
-        this.gridCtx.strokeStyle = '#d0d0d0';
+        this.gridCtx.strokeStyle = themeColors.gridColor;
         this.gridCtx.lineWidth = 1;
         this.gridCtx.beginPath();
         
@@ -444,7 +468,7 @@ class SplineGenerator {
         this.gridCtx.stroke();
         
         // Main axes (X=0, Y=0) - only if they're within the visible range
-        this.gridCtx.strokeStyle = '#333333';
+        this.gridCtx.strokeStyle = themeColors.axisColor;
         this.gridCtx.lineWidth = 2;
         this.gridCtx.beginPath();
         
@@ -463,14 +487,14 @@ class SplineGenerator {
         this.gridCtx.stroke();
         
         // Draw labels for both minor and major grid lines
-        this.drawGridLabels(scale, scale, zeroX, zeroY, offsetX, offsetY, usedWidth, usedHeight);
+        this.drawGridLabels(scale, scale, zeroX, zeroY, offsetX, offsetY, usedWidth, usedHeight, themeColors);
         
         console.log('Grid drawing completed');
     }
     
-    drawGridLabels(scaleX, scaleY, zeroX, zeroY, offsetX, offsetY, usedWidth, usedHeight) {
+    drawGridLabels(scaleX, scaleY, zeroX, zeroY, offsetX, offsetY, usedWidth, usedHeight, themeColors) {
         // Set up text style
-        this.gridCtx.fillStyle = '#666666';
+        this.gridCtx.fillStyle = themeColors.textColor;
         this.gridCtx.font = '11px Arial';
         
         // X axis labels (horizontal)
@@ -492,12 +516,12 @@ class SplineGenerator {
                 
                 // Major labels (darker, with "mm")
                 if (x % (this.settings.gridSize * 5) === 0) {
-                    this.gridCtx.fillStyle = '#333333';
+                    this.gridCtx.fillStyle = themeColors.textColor;
                     this.gridCtx.font = 'bold 12px Arial';
                     this.gridCtx.fillText(x + 'mm', canvasX, labelY);
                 } else {
                     // Minor labels (lighter)
-                    this.gridCtx.fillStyle = '#999999';
+                    this.gridCtx.fillStyle = themeColors.textColor;
                     this.gridCtx.font = '10px Arial';
                     this.gridCtx.fillText(x.toString(), canvasX, labelY);
                 }
@@ -523,12 +547,12 @@ class SplineGenerator {
                 
                 // Major labels (darker, with "mm")
                 if (y % (this.settings.gridSize * 5) === 0) {
-                    this.gridCtx.fillStyle = '#333333';
+                    this.gridCtx.fillStyle = themeColors.textColor;
                     this.gridCtx.font = 'bold 12px Arial';
                     this.gridCtx.fillText(y + 'mm', labelX, canvasY);
                 } else {
                     // Minor labels (lighter)
-                    this.gridCtx.fillStyle = '#999999';
+                    this.gridCtx.fillStyle = themeColors.textColor;
                     this.gridCtx.font = '10px Arial';
                     this.gridCtx.fillText(y.toString(), labelX, canvasY);
                 }
@@ -537,14 +561,14 @@ class SplineGenerator {
         
         // Origin label (0,0) - only if origin is visible
         if (0 >= this.settings.minX && 0 <= this.settings.maxX && 0 >= this.settings.minY && 0 <= this.settings.maxY) {
-            this.gridCtx.fillStyle = '#000000';
+            this.gridCtx.fillStyle = themeColors.textColor;
             this.gridCtx.font = 'bold 14px Arial';
             this.gridCtx.textAlign = 'right';
             this.gridCtx.textBaseline = 'bottom';
             this.gridCtx.fillText('0', zeroX - 6, zeroY - 6);
             
             // Draw small markers at origin
-            this.gridCtx.strokeStyle = '#000000';
+            this.gridCtx.strokeStyle = themeColors.textColor;
             this.gridCtx.lineWidth = 2;
             this.gridCtx.beginPath();
             // X axis marker
@@ -557,11 +581,11 @@ class SplineGenerator {
         }
         
         // Draw axis labels
-        this.drawAxisLabels(zeroX, zeroY);
+        this.drawAxisLabels(zeroX, zeroY, themeColors);
     }
     
-    drawAxisLabels(zeroX, zeroY) {
-        this.gridCtx.fillStyle = '#000000';
+    drawAxisLabels(zeroX, zeroY, themeColors) {
+        this.gridCtx.fillStyle = themeColors.textColor;
         this.gridCtx.font = 'bold 16px Arial';
         
         // X axis label (horizontal axis) - position at right end
@@ -2443,10 +2467,11 @@ class SplineGenerator {
     
     drawPositionIndicator(worldX, worldY) {
         const screenPos = this.worldToScreen(worldX, worldY);
+        const themeColors = this.getThemeColors();
         
-        // Draw outer circle (white border)
-        this.animationCtx.fillStyle = 'white';
-        this.animationCtx.strokeStyle = '#333';
+        // Draw outer circle (theme border)
+        this.animationCtx.fillStyle = themeColors.pointFill;
+        this.animationCtx.strokeStyle = themeColors.pointBorder;
         this.animationCtx.lineWidth = 2;
         this.animationCtx.beginPath();
         this.animationCtx.arc(screenPos.x, screenPos.y, 8, 0, 2 * Math.PI);
@@ -2735,6 +2760,48 @@ END\n`;
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    // Dark Mode Management
+    toggleDarkMode() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
+        this.setTheme(newTheme);
+        this.saveDarkModePreference(newTheme);
+    }
+
+    setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        
+        // Update button icon
+        const icon = this.darkModeBtn.querySelector('.material-symbols-outlined');
+        if (icon) {
+            icon.textContent = theme === 'dark' ? 'light_mode' : 'dark_mode';
+        }
+        
+        // Update button title
+        this.darkModeBtn.title = theme === 'dark' ? 'Modalità chiara' : 'Modalità scura';
+        
+        // Redraw canvas with new theme
+        this.drawGrid();
+        this.redrawCanvas();
+    }
+
+    loadDarkModePreference() {
+        // Check for saved preference, otherwise use dark mode as default
+        const savedTheme = localStorage.getItem('spline-generator-theme');
+        
+        if (savedTheme) {
+            this.setTheme(savedTheme);
+        } else {
+            // Use dark mode as default
+            this.setTheme('dark');
+        }
+    }
+
+    saveDarkModePreference(theme) {
+        localStorage.setItem('spline-generator-theme', theme);
     }
 }
 
