@@ -802,6 +802,7 @@ class SplineGenerator {
             this.updateSelectedCount();
             this.updateTableSelection();
             this.highlightSelectedPoints();
+            this.scrollToPointInTable(clickedPointIndex);
         } else {
             // Clicked on empty space - clear selection unless holding Ctrl
             if (!e.ctrlKey) {
@@ -1589,6 +1590,30 @@ class SplineGenerator {
                 row.classList.remove('selected');
             }
         });
+    }
+
+    scrollToPointInTable(pointIndex) {
+        // Find the table row for this point
+        const tableRow = document.querySelector(`#splineTableBody tr:nth-child(${pointIndex + 1})`);
+        if (!tableRow) return;
+        
+        // Find the table container
+        const tableContainer = document.querySelector('.table-container');
+        if (!tableContainer) return;
+        
+        // Calculate scroll position to center the row in view
+        const rowTop = tableRow.offsetTop;
+        const rowHeight = tableRow.offsetHeight;
+        const containerHeight = tableContainer.clientHeight;
+        const scrollTop = rowTop - (containerHeight / 2) + (rowHeight / 2);
+        
+        // Smooth scroll to the row
+        tableContainer.scrollTo({
+            top: Math.max(0, scrollTop),
+            behavior: 'smooth'
+        });
+        
+        console.log(`Scrolled to point ${pointIndex + 1} in table`);
     }
 
     highlightSelectedPoints() {
