@@ -1772,12 +1772,26 @@ class SplineGenerator {
         }
     }
 
-    saveProject() {
+    // Generate timestamp for filename
+    generateTimestamp() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+    }
+
+    async saveProject() {
         // Save current path to current index before saving
         this.saveCurrentPathToIndex();
         
-        // Get project name from settings
+        // Get project name from settings with timestamp
         const projectName = this.settings.basename;
+        const timestamp = this.generateTimestamp();
+        const fileName = `${projectName}_${timestamp}`;
         
         const projectData = {
             version: '2.0', // Updated version for multi-path support
@@ -1789,19 +1803,46 @@ class SplineGenerator {
         };
         
         const dataStr = JSON.stringify(projectData, null, 2);
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
         
-        // Use project basename as filename
-        const fileName = projectName.replace(/[^a-zA-Z0-9_\-]/g, '-');
-        
+        try {
+            // Try using File System Access API (modern browsers)
+            if ('showSaveFilePicker' in window) {
+                const fileHandle = await window.showSaveFilePicker({
+                    suggestedName: `${fileName}.json`,
+                    types: [{
+                        description: 'SpLine Project files',
+                        accept: { 'application/json': ['.json'] }
+                    }]
+                });
+                
+                const writable = await fileHandle.createWritable();
+                await writable.write(dataStr);
+                await writable.close();
+                
+                console.log(`Project saved: ${fileName}.json with ${Object.keys(this.programPaths).length} program paths`);
+                alert('Progetto salvato con successo!');
+            } else {
+                // Fallback to download for older browsers
+                this.downloadFile(dataStr, `${fileName}.json`, 'application/json');
+                console.log(`Project downloaded: ${fileName}.json with ${Object.keys(this.programPaths).length} program paths`);
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                // If File System Access fails, fallback to download
+                this.downloadFile(dataStr, `${fileName}.json`, 'application/json');
+                console.log(`Project downloaded (fallback): ${fileName}.json`);
+            }
+        }
+    }
+
+    // Helper function for file download
+    downloadFile(content, filename, contentType) {
+        const dataBlob = new Blob([content], { type: contentType });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(dataBlob);
-        link.download = `${fileName}.json`;
+        link.download = filename;
         link.click();
-        
         URL.revokeObjectURL(link.href);
-        
-        console.log(`Project saved: ${fileName}.json with ${Object.keys(this.programPaths).length} program paths`);
     }
 
     loadProject(event) {
@@ -2678,7 +2719,7 @@ class SplineGenerator {
         }
     }
     
-    exportKukaCode() {
+    async exportKukaCode() {
         // Get current program name from settings and index
         const programIndex = this.programIndex ? this.programIndex.value : '1';
         let projectName = `${this.settings.basename}${programIndex}`;
@@ -2686,30 +2727,92 @@ class SplineGenerator {
         // Ensure valid filename for KUKA (only letters, numbers, underscore)
         projectName = projectName.replace(/[^a-zA-Z0-9_]/g, '_');
         
-        // Try to load templates, fallback to default if not available
-        this.loadKukaTemplates().then(templates => {
-            // Generate .dat file
+        try {
+            // Load templates
+            let templates;
+            try {
+                templates = await this.loadKukaTemplates();
+                console.log('Using templates from templates folder');
+            } catch (error) {
+                console.log('Using embedded templates (templates folder not accessible)');
+                templates = this.getEmbeddedKukaTemplates();
+            }
+            
+            // Generate files content
             const datContent = this.generateKukaDatFromTemplate(projectName, templates.dat);
-            this.downloadFile(datContent, `${projectName}.dat`, 'text/plain');
-            
-            // Generate .src file
             const srcContent = this.generateKukaSrcFromTemplate(projectName, templates.src);
-            this.downloadFile(srcContent, `${projectName}.src`, 'text/plain');
             
-            console.log('KUKA files exported:', `${projectName}.dat`, `${projectName}.src`);
-        }).catch(error => {
-            console.log('Using embedded templates (templates folder not accessible)');
-            // Use embedded templates
-            const templates = this.getEmbeddedKukaTemplates();
+            // Try using File System Access API for directory selection
+            if ('showDirectoryPicker' in window) {
+                try {
+                    const directoryHandle = await window.showDirectoryPicker();
+                    
+                    // Save .dat file
+                    const datFileHandle = await directoryHandle.getFileHandle(`${projectName}.dat`, { create: true });
+                    const datWritable = await datFileHandle.createWritable();
+                    await datWritable.write(datContent);
+                    await datWritable.close();
+                    
+                    // Save .src file
+                    const srcFileHandle = await directoryHandle.getFileHandle(`${projectName}.src`, { create: true });
+                    const srcWritable = await srcFileHandle.createWritable();
+                    await srcWritable.write(srcContent);
+                    await srcWritable.close();
+                    
+                    console.log('KUKA files exported to selected directory:', `${projectName}.dat`, `${projectName}.src`);
+                    alert(`File KUKA esportati con successo!\n${projectName}.dat\n${projectName}.src`);
+                    
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        // Fallback to individual file saves
+                        await this.saveKukaFileWithPicker(datContent, `${projectName}.dat`);
+                        await this.saveKukaFileWithPicker(srcContent, `${projectName}.src`);
+                    }
+                }
+            } else {
+                // Fallback for browsers without directory picker
+                await this.saveKukaFileWithPicker(datContent, `${projectName}.dat`);
+                await this.saveKukaFileWithPicker(srcContent, `${projectName}.src`);
+            }
             
-            const datContent = this.generateKukaDatFromTemplate(projectName, templates.dat);
-            this.downloadFile(datContent, `${projectName}.dat`, 'text/plain');
-            
-            const srcContent = this.generateKukaSrcFromTemplate(projectName, templates.src);
-            this.downloadFile(srcContent, `${projectName}.src`, 'text/plain');
-            
-            console.log('KUKA files exported using embedded templates');
-        });
+        } catch (error) {
+            console.error('Error during KUKA export:', error);
+            alert('Errore durante l\'esportazione: ' + error.message);
+        }
+    }
+
+    // Helper function for individual file saving
+    async saveKukaFileWithPicker(content, filename) {
+        try {
+            if ('showSaveFilePicker' in window) {
+                const fileHandle = await window.showSaveFilePicker({
+                    suggestedName: filename,
+                    types: [{
+                        description: 'KUKA Robot files',
+                        accept: { 
+                            'text/plain': ['.dat', '.src'],
+                            'application/octet-stream': ['.dat', '.src']
+                        }
+                    }]
+                });
+                
+                const writable = await fileHandle.createWritable();
+                await writable.write(content);
+                await writable.close();
+                
+                console.log(`KUKA file saved: ${filename}`);
+            } else {
+                // Fallback to download
+                this.downloadFile(content, filename, 'text/plain');
+                console.log(`KUKA file downloaded: ${filename}`);
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                // Final fallback to download
+                this.downloadFile(content, filename, 'text/plain');
+                console.log(`KUKA file downloaded (fallback): ${filename}`);
+            }
+        }
     }
     
     getEmbeddedKukaTemplates() {
