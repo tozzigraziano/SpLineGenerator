@@ -1,6 +1,7 @@
 class SplineGenerator {
     constructor() {
-        console.log('SplineGenerator constructor called');
+        console.log('🚀 SplineGenerator v2.1 - Multi-Path System with Fixed Loading! 🚀');
+        console.log('Timestamp:', new Date().toISOString());
         
         // Initialize in correct order
         this.initializeSettings();
@@ -1812,9 +1813,22 @@ class SplineGenerator {
             try {
                 const projectData = JSON.parse(e.target.result);
                 
-                // Validate project data
-                if (!projectData.version || !projectData.splinePoints || !projectData.shapes) {
-                    throw new Error('File non valido');
+                console.log('Loading project data:', projectData);
+                
+                // Validate project data - support both v1.0 and v2.0 formats
+                if (!projectData.version) {
+                    throw new Error('File non valido: versione mancante');
+                }
+                
+                // For v2.0+ check for programPaths, for v1.0 check for splinePoints/shapes
+                if (projectData.version === '2.0') {
+                    if (!projectData.programPaths && !projectData.settings) {
+                        throw new Error('File non valido: dati del progetto v2.0 mancanti');
+                    }
+                } else {
+                    if (!projectData.splinePoints || !projectData.shapes) {
+                        throw new Error('File non valido: dati del progetto v1.0 mancanti');
+                    }
                 }
                 
                 // Clear everything before loading new project
@@ -2937,7 +2951,8 @@ END\n`;
         
         // Redraw canvas with new theme
         this.drawGrid();
-        this.redrawCanvas();
+        this.drawSpline();
+        this.redrawShapes();
     }
 
     loadDarkModePreference() {
