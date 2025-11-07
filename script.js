@@ -684,10 +684,72 @@ class SplineGenerator {
         this.isMouseDown = true;
         const worldPos = this.getMousePosition(e);
         
-        if (this.currentTool === 'spline') {
+        if (this.currentTool === 'select') {
+            this.handleSelectClick(e);
+        } else if (this.currentTool === 'spline') {
             this.startSpline(worldPos);
         } else {
             this.startShape(worldPos);
+        }
+    }
+
+    handleSelectClick(e) {
+        const rect = this.splineCanvas.getBoundingClientRect();
+        const canvasX = e.clientX - rect.left;
+        const canvasY = e.clientY - rect.top;
+        
+        // Find point under mouse cursor
+        const clickedPointIndex = this.findPointUnderMouse(canvasX, canvasY);
+        
+        if (clickedPointIndex !== -1) {
+            // Point clicked - handle selection
+            if (e.shiftKey && this.lastSelectedIndex !== -1) {
+                // Shift selection: select range
+                const start = Math.min(this.lastSelectedIndex, clickedPointIndex);
+                const end = Math.max(this.lastSelectedIndex, clickedPointIndex);
+                
+                for (let i = start; i <= end; i++) {
+                    this.selectedPoints.add(i);
+                    const cb = document.querySelector(`.point-checkbox[data-index="${i}"]`);
+                    if (cb) cb.checked = true;
+                }
+            } else if (e.ctrlKey) {
+                // Ctrl selection: toggle single point
+                if (this.selectedPoints.has(clickedPointIndex)) {
+                    this.selectedPoints.delete(clickedPointIndex);
+                    const cb = document.querySelector(`.point-checkbox[data-index="${clickedPointIndex}"]`);
+                    if (cb) cb.checked = false;
+                } else {
+                    this.selectedPoints.add(clickedPointIndex);
+                    const cb = document.querySelector(`.point-checkbox[data-index="${clickedPointIndex}"]`);
+                    if (cb) cb.checked = true;
+                }
+            } else {
+                // Normal selection: select only this point
+                this.selectedPoints.clear();
+                this.selectedPoints.add(clickedPointIndex);
+                
+                // Update all checkboxes
+                document.querySelectorAll('.point-checkbox').forEach((checkbox, index) => {
+                    checkbox.checked = (index === clickedPointIndex);
+                });
+            }
+            
+            this.lastSelectedIndex = clickedPointIndex;
+            this.updateSelectedCount();
+            this.updateTableSelection();
+            this.highlightSelectedPoints();
+        } else {
+            // Clicked on empty space - clear selection unless holding Ctrl
+            if (!e.ctrlKey) {
+                this.selectedPoints.clear();
+                document.querySelectorAll('.point-checkbox').forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                this.updateSelectedCount();
+                this.updateTableSelection();
+                this.highlightSelectedPoints();
+            }
         }
     }
 
@@ -704,7 +766,7 @@ class SplineGenerator {
             this.updateCoordinates(snappedWorldPos);
         }
         
-        if (this.isMouseDown) {
+        if (this.isMouseDown && this.currentTool !== 'select') {
             if (this.currentTool === 'spline' && this.isDrawing) {
                 this.continueSampling(snappedWorldPos);
             } else if (this.currentTool !== 'spline') {
@@ -819,7 +881,7 @@ class SplineGenerator {
     }
 
     handleMouseUp(e) {
-        if (this.isMouseDown) {
+        if (this.isMouseDown && this.currentTool !== 'select') {
             const worldPos = this.getMousePosition(e);
             
             if (this.currentTool === 'spline') {
@@ -1016,8 +1078,20 @@ class SplineGenerator {
         this.toolButtons.forEach(btn => btn.classList.remove('active'));
         document.querySelector(`[data-tool="${tool}"]`).classList.add('active');
         
-        // Update cursor
-        const cursor = tool === 'spline' ? 'crosshair' : 'crosshair';
+        // Update cursor based on tool
+        let cursor = 'crosshair';
+        switch(tool) {
+            case 'select':
+                cursor = 'default';
+                break;
+            case 'spline':
+                cursor = 'crosshair';
+                break;
+            case 'rectangle':
+            case 'circle':
+                cursor = 'crosshair';
+                break;
+        }
         this.splineCanvas.style.cursor = cursor;
     }
 
