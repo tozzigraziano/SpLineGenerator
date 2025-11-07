@@ -94,6 +94,7 @@ class SplineGenerator {
         this.selectAllPointsBtn = document.getElementById('selectAllPoints');
         this.bulkVelocityInput = document.getElementById('bulkVelocity');
         this.applyBulkVelocityBtn = document.getElementById('applyBulkVelocity');
+        this.deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
         this.pointCountDisplay = document.getElementById('pointCount');
         this.selectedCountDisplay = document.getElementById('selectedCount');
         this.shapesCountDisplay = document.getElementById('shapesCount');
@@ -335,6 +336,10 @@ class SplineGenerator {
         
         if (this.applyBulkVelocityBtn) {
             this.applyBulkVelocityBtn.addEventListener('click', () => this.applyBulkVelocity());
+        }
+        
+        if (this.deleteSelectedBtn) {
+            this.deleteSelectedBtn.addEventListener('click', () => this.deleteSelectedPoints());
         }
         
         // Event listener per il checkbox "Seleziona tutto"
@@ -1517,6 +1522,15 @@ class SplineGenerator {
         if (this.selectedCountDisplay) {
             this.selectedCountDisplay.textContent = `${this.selectedPoints.size} selezionati`;
         }
+        
+        // Show/hide delete button based on selection
+        if (this.deleteSelectedBtn) {
+            if (this.selectedPoints.size > 0) {
+                this.deleteSelectedBtn.style.display = 'inline-flex';
+            } else {
+                this.deleteSelectedBtn.style.display = 'none';
+            }
+        }
     }
 
     updateShapesCount() {
@@ -1579,6 +1593,49 @@ class SplineGenerator {
         this.highlightSelectedPoints();
         this.updateSplineTable();
         this.bulkVelocityInput.value = '';
+    }
+
+    deleteSelectedPoints() {
+        if (this.selectedPoints.size === 0) {
+            alert('Selezionare almeno un punto da eliminare');
+            return;
+        }
+        
+        const count = this.selectedPoints.size;
+        const confirmMessage = count === 1 ? 
+            'Eliminare il punto selezionato?' : 
+            `Eliminare ${count} punti selezionati?`;
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
+        // Convert Set to sorted array (descending order to avoid index shifting)
+        const indicesToDelete = Array.from(this.selectedPoints).sort((a, b) => b - a);
+        
+        // Remove points from highest index to lowest to avoid index shifting issues
+        indicesToDelete.forEach(index => {
+            if (index < this.splinePoints.length) {
+                this.splinePoints.splice(index, 1);
+            }
+        });
+        
+        // Clear selection
+        this.selectedPoints.clear();
+        this.lastSelectedIndex = -1;
+        
+        // Update displays and graphics
+        this.updateSelectedCount();
+        this.updateSplineTable();
+        this.highlightSelectedPoints();
+        this.drawSpline();
+        this.updateSplineLength();
+        this.updatePointCount();
+        
+        // Save current path data
+        this.saveCurrentPathToIndex();
+        
+        console.log(`Deleted ${count} points`);
     }
 
     removePoint(index) {

@@ -221,6 +221,15 @@ header h1 {
     background: linear-gradient(145deg, #e0a800, #d39e00);
 }
 
+.btn-danger {
+    background: linear-gradient(145deg, #dc3545, #c82333);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: linear-gradient(145deg, #c82333, #bd2130);
+}
+
 /* Main content */
 main {
     flex: 1;
