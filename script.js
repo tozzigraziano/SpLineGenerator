@@ -17,6 +17,8 @@ class SplineGenerator {
         this.selectedPoints = new Set(); // Track selected points
         this.lastSelectedIndex = -1; // For shift selection
         this.lastSnapIndicator = null; // For snap indicator cleanup
+        this.hoveredPointIndex = -1; // Track hovered point for tooltip
+        this.tooltipTimeout = null; // Timeout for tooltip delay
         
         // Animation properties
         this.isAnimating = false;
@@ -240,6 +242,8 @@ class SplineGenerator {
             // Don't end drawing when mouse leaves canvas - allow continuation
             this.splineCanvas.addEventListener('mouseleave', (e) => {
                 console.log('Mouse left canvas, but continuing drawing...');
+                // Hide tooltip when mouse leaves canvas
+                this.hidePointTooltip();
                 // Don't call handleMouseUp here to allow drawing continuation
             });
             
@@ -710,6 +714,108 @@ class SplineGenerator {
         
         // Draw snap indicator
         this.drawSnapIndicator(snappedWorldPos);
+        
+        // Handle point tooltip
+        this.handlePointTooltip(e);
+    }
+
+    handlePointTooltip(e) {
+        // Don't show tooltip while drawing
+        if (this.isMouseDown) {
+            this.hidePointTooltip();
+            if (this.tooltipTimeout) {
+                clearTimeout(this.tooltipTimeout);
+                this.tooltipTimeout = null;
+            }
+            return;
+        }
+        
+        const rect = this.splineCanvas.getBoundingClientRect();
+        const canvasX = e.clientX - rect.left;
+        const canvasY = e.clientY - rect.top;
+        
+        // Find point under mouse cursor
+        const hoveredPointIndex = this.findPointUnderMouse(canvasX, canvasY);
+        
+        if (hoveredPointIndex !== -1) {
+            // If hovering over a different point, cancel previous timeout
+            if (this.hoveredPointIndex !== hoveredPointIndex) {
+                this.hidePointTooltip();
+                if (this.tooltipTimeout) {
+                    clearTimeout(this.tooltipTimeout);
+                }
+                
+                this.hoveredPointIndex = hoveredPointIndex;
+                
+                // Set timeout for showing tooltip after 200ms
+                this.tooltipTimeout = setTimeout(() => {
+                    this.showPointTooltip(hoveredPointIndex, e.clientX, e.clientY);
+                }, 200);
+            }
+        } else {
+            // Not hovering over any point
+            this.hoveredPointIndex = -1;
+            this.hidePointTooltip();
+            if (this.tooltipTimeout) {
+                clearTimeout(this.tooltipTimeout);
+                this.tooltipTimeout = null;
+            }
+        }
+    }
+
+    findPointUnderMouse(canvasX, canvasY) {
+        const tolerance = 8; // pixels
+        
+        for (let i = 0; i < this.splinePoints.length; i++) {
+            const point = this.splinePoints[i];
+            const screenPos = this.worldToScreen(point.x, point.y);
+            
+            const distance = Math.sqrt(
+                Math.pow(canvasX - screenPos.x, 2) + 
+                Math.pow(canvasY - screenPos.y, 2)
+            );
+            
+            if (distance <= tolerance) {
+                return i;
+            }
+        }
+        
+        return -1;
+    }
+
+    showPointTooltip(pointIndex, screenX, screenY) {
+        if (!this.pointTooltip) {
+            this.pointTooltip = document.createElement('div');
+            this.pointTooltip.className = 'point-tooltip';
+            this.pointTooltip.style.cssText = `
+                position: fixed;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                pointer-events: none;
+                z-index: 1000;
+                white-space: nowrap;
+            `;
+            document.body.appendChild(this.pointTooltip);
+        }
+        
+        const point = this.splinePoints[pointIndex];
+        this.pointTooltip.textContent = `Punto ${pointIndex + 1}: ${this.settings.xAxisLabel}=${point.x.toFixed(1)}, ${this.settings.yAxisLabel}=${point.y.toFixed(1)} mm, v=${point.velocity} mm/s`;
+        this.pointTooltip.style.display = 'block';
+        this.pointTooltip.style.left = (screenX + 10) + 'px';
+        this.pointTooltip.style.top = (screenY - 25) + 'px';
+    }
+
+    hidePointTooltip() {
+        if (this.pointTooltip) {
+            this.pointTooltip.style.display = 'none';
+        }
+        if (this.tooltipTimeout) {
+            clearTimeout(this.tooltipTimeout);
+            this.tooltipTimeout = null;
+        }
     }
 
     handleMouseUp(e) {
