@@ -135,6 +135,10 @@ class SplineGenerator {
         };
         this.loadSettingsFromStorage();
         this.updateSettingsUI();
+        
+        // Initialize multiple paths storage
+        this.programPaths = {}; // Object to store multiple paths indexed by program number
+        this.currentProgramIndex = 1; // Currently selected program index
     }
 
     initializeCanvases() {
@@ -268,6 +272,13 @@ class SplineGenerator {
         // Export button
         if (this.exportBtn) {
             this.exportBtn.addEventListener('click', () => this.exportRobotCode());
+        }
+        
+        // Program index change
+        if (this.programIndex) {
+            this.programIndex.addEventListener('change', (e) => {
+                this.loadPathFromIndex(e.target.value);
+            });
         }
         
         // Canvas events
@@ -1720,6 +1731,9 @@ class SplineGenerator {
 
     clearSpline() {
         if (confirm('Eliminare tutti i punti della spline?')) {
+            // Save current path before clearing
+            this.saveCurrentPathToIndex();
+            
             this.splinePoints = [];
             this.selectedPoints.clear();
             this.lastSelectedIndex = null;
@@ -1734,40 +1748,50 @@ class SplineGenerator {
             this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
             
             this.updateSplineTable();
+            
+            // Update saved path with cleared data
+            this.saveCurrentPathToIndex();
         }
     }
 
     clearShapes() {
         if (confirm('Eliminare tutte le geometrie?')) {
+            // Save current path before clearing
+            this.saveCurrentPathToIndex();
+            
             this.shapes = [];
             
             // Clear the shapes canvas
             this.shapeCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
             
             this.updateShapesTable();
+            
+            // Update saved path with cleared data
+            this.saveCurrentPathToIndex();
         }
     }
 
     saveProject() {
-        // Get current program name from settings and index
-        const programIndex = this.programIndex ? this.programIndex.value : '1';
-        const programName = `${this.settings.basename}${programIndex}`;
+        // Save current path to current index before saving
+        this.saveCurrentPathToIndex();
+        
+        // Get project name from settings
+        const projectName = this.settings.basename;
         
         const projectData = {
-            version: '1.0',
+            version: '2.0', // Updated version for multi-path support
             timestamp: new Date().toISOString(),
-            programName: programName,
-            programIndex: parseInt(programIndex),
+            projectName: projectName,
+            currentProgramIndex: this.currentProgramIndex,
             settings: this.settings,
-            splinePoints: this.splinePoints,
-            shapes: this.shapes
+            programPaths: this.programPaths // All paths indexed by program number
         };
         
         const dataStr = JSON.stringify(projectData, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
         
-        // Use program name as filename
-        const fileName = programName.replace(/[^a-zA-Z0-9_\-]/g, '-');
+        // Use project basename as filename
+        const fileName = projectName.replace(/[^a-zA-Z0-9_\-]/g, '-');
         
         const link = document.createElement('a');
         link.href = URL.createObjectURL(dataBlob);
@@ -1775,6 +1799,8 @@ class SplineGenerator {
         link.click();
         
         URL.revokeObjectURL(link.href);
+        
+        console.log(`Project saved: ${fileName}.json with ${Object.keys(this.programPaths).length} program paths`);
     }
 
     loadProject(event) {
@@ -1797,10 +1823,10 @@ class SplineGenerator {
                 this.selectedPoints.clear();
                 this.lastSelectedIndex = null;
                 this.lastSnapIndicator = null;
+                this.programPaths = {}; // Clear all program paths
                 
                 // Clear all canvases
-                this.splineCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
-                this.shapeCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+                this.clearAllCanvases();
                 
                 // Load data from project
                 if (projectData.settings) {
@@ -1808,41 +1834,51 @@ class SplineGenerator {
                     this.settings = { 
                         ...this.settings, 
                         ...projectData.settings,
-                        // Ensure new axis label settings have defaults if not present
+                        // Ensure new settings have defaults if not present
                         xAxisLabel: projectData.settings.xAxisLabel || 'X',
-                        yAxisLabel: projectData.settings.yAxisLabel || 'Y'
+                        yAxisLabel: projectData.settings.yAxisLabel || 'Y',
+                        basename: projectData.settings.basename || projectData.projectName || 'program',
+                        maxProgramNum: projectData.settings.maxProgramNum || 999
                     };
                     this.updateSettingsUI();
                     this.saveSettingsToStorage();
                 }
                 
-                // Load program name and index if available
-                if (projectData.programName || projectData.projectName) {
-                    // Handle both new and legacy format
-                    const programName = projectData.programName || projectData.projectName;
+                // Check if this is the new multi-path format (version 2.0+)
+                if (projectData.version === '2.0' && projectData.programPaths) {
+                    // New format: load all program paths
+                    this.programPaths = projectData.programPaths;
+                    this.currentProgramIndex = projectData.currentProgramIndex || 1;
                     
-                    // Try to extract basename and index from program name
-                    const match = programName.match(/^(.+?)(\d+)$/);
-                    if (match) {
-                        const [, basename, index] = match;
-                        // Update settings if basename is different
-                        if (basename !== this.settings.basename) {
-                            this.settings.basename = basename;
-                        }
-                        // Set program index
-                        if (this.programIndex && parseInt(index) <= this.settings.maxProgramNum) {
-                            this.programIndex.value = index;
-                        }
+                    // Set program index selector
+                    if (this.programIndex) {
+                        this.programIndex.value = this.currentProgramIndex;
                     }
                     
-                    // If there's a saved programIndex, use it
-                    if (projectData.programIndex && this.programIndex) {
-                        this.programIndex.value = Math.min(projectData.programIndex, this.settings.maxProgramNum);
+                    // Load the current program path
+                    this.loadPathFromIndex(this.currentProgramIndex);
+                    
+                    console.log(`Multi-path project loaded with ${Object.keys(this.programPaths).length} program paths`);
+                } else {
+                    // Legacy format: convert single path to multi-path format
+                    const legacyIndex = projectData.programIndex || 1;
+                    
+                    this.programPaths[legacyIndex] = {
+                        splinePoints: projectData.splinePoints || [],
+                        shapes: projectData.shapes || []
+                    };
+                    
+                    this.currentProgramIndex = legacyIndex;
+                    this.splinePoints = projectData.splinePoints || [];
+                    this.shapes = projectData.shapes || [];
+                    
+                    // Set program index selector
+                    if (this.programIndex) {
+                        this.programIndex.value = legacyIndex;
                     }
+                    
+                    console.log(`Legacy project converted to multi-path format at index ${legacyIndex}`);
                 }
-                
-                this.splinePoints = projectData.splinePoints || [];
-                this.shapes = projectData.shapes || [];
                 
                 // Redraw everything with updated settings
                 this.drawGrid();
@@ -2012,21 +2048,88 @@ class SplineGenerator {
             this.programBasename.textContent = this.settings.basename || 'program';
         }
         
-        // Update program index options
+        // Update program index options and sync with current index
         if (this.programIndex) {
-            const currentValue = this.programIndex.value || '1';
+            const currentValue = this.currentProgramIndex || 1;
             this.programIndex.innerHTML = '';
             
             for (let i = 1; i <= this.settings.maxProgramNum; i++) {
                 const option = document.createElement('option');
                 option.value = i;
                 option.textContent = i;
-                if (i.toString() === currentValue && i <= this.settings.maxProgramNum) {
+                if (i === currentValue) {
                     option.selected = true;
                 }
                 this.programIndex.appendChild(option);
             }
+            
+            // Ensure the selector shows the current index
+            this.programIndex.value = currentValue;
         }
+    }
+
+    // Save current path to the selected program index
+    saveCurrentPathToIndex() {
+        const programIndex = this.currentProgramIndex || 1;
+        this.programPaths[programIndex] = {
+            splinePoints: [...this.splinePoints],
+            shapes: [...this.shapes]
+        };
+        console.log(`Path saved to program index ${programIndex}`, {
+            splinePoints: this.splinePoints.length,
+            shapes: this.shapes.length
+        });
+    }
+
+    // Load path from the selected program index
+    loadPathFromIndex(programIndex) {
+        const targetIndex = parseInt(programIndex);
+        
+        // Save current path to the CURRENT index before switching (not the target)
+        if (this.currentProgramIndex !== targetIndex) {
+            this.saveCurrentPathToIndex();
+        }
+        
+        if (this.programPaths[targetIndex]) {
+            // Load the selected path
+            this.splinePoints = [...this.programPaths[targetIndex].splinePoints];
+            this.shapes = [...this.programPaths[targetIndex].shapes];
+            
+            console.log(`Path loaded from program index ${targetIndex}`, {
+                splinePointsLoaded: this.splinePoints.length,
+                shapesLoaded: this.shapes.length,
+                allSavedPaths: Object.keys(this.programPaths)
+            });
+        } else {
+            // Initialize empty path for new index
+            this.splinePoints = [];
+            this.shapes = [];
+            
+            console.log(`New empty path created for program index ${targetIndex}`);
+        }
+        
+        // Clear selections
+        this.selectedPoints.clear();
+        this.lastSelectedIndex = null;
+        this.lastSnapIndicator = null;
+        
+        // Update current index AFTER loading
+        this.currentProgramIndex = targetIndex;
+        
+        // Redraw everything
+        this.clearAllCanvases();
+        this.drawGrid();
+        this.drawSpline();
+        this.redrawShapes();
+        this.updateSplineTable();
+        this.updateShapesTable();
+    }
+
+    // Clear all canvases
+    clearAllCanvases() {
+        this.splineCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        this.shapeCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
     }
 
     saveSettingsToStorage() {
