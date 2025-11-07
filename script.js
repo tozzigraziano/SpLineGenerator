@@ -21,6 +21,10 @@ class SplineGenerator {
         this.hoveredPointIndex = -1; // Track hovered point for tooltip
         this.tooltipTimeout = null; // Timeout for tooltip delay
         
+        // Reference path for visual aid when creating new paths
+        this.referencePath = null; // Previous path to show as reference
+        this.showReferencePath = false; // Flag to show/hide reference path
+        
         // Animation properties
         this.isAnimating = false;
         this.isPaused = false;
@@ -958,6 +962,14 @@ class SplineGenerator {
     // Spline functionality
     startSpline(worldPos) {
         if (!this.isDrawing) {
+            // Handle reference path when starting to draw a new spline
+            if (this.splinePoints.length > 0) {
+                // Store existing spline as reference before clearing
+                this.referencePath = [...this.splinePoints];
+                this.showReferencePath = true;
+                console.log(`Starting new spline: storing current path with ${this.referencePath.length} points as reference`);
+            }
+            
             // Clear any existing animation when starting a new spline
             if (this.animationCtx) {
                 this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
@@ -966,6 +978,9 @@ class SplineGenerator {
             this.splinePoints = [worldPos];
             this.isDrawing = true;
             this.lastSampleTime = Date.now();
+            
+            // Redraw to show new point with reference path
+            this.drawSpline();
         } else {
             // Single click adds point
             this.splinePoints.push(worldPos);
@@ -1009,6 +1024,12 @@ class SplineGenerator {
 
     endSpline() {
         this.isDrawing = false;
+        
+        // Hide reference path when finishing drawing
+        if (this.showReferencePath) {
+            this.showReferencePath = false;
+            this.drawSpline(); // Redraw without reference path
+        }
     }
 
     clampToGraphLimits(worldPos) {
@@ -1021,9 +1042,28 @@ class SplineGenerator {
     }
 
     drawSpline() {
-        if (this.splinePoints.length < 2) return;
-        
+        // Clear canvas first
         this.splineCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        
+        // Draw reference path first (if enabled)
+        if (this.showReferencePath && this.referencePath && this.referencePath.length >= 2) {
+            console.log(`Drawing reference path with ${this.referencePath.length} points`);
+            this.drawReferencePath();
+        }
+        
+        // Return early if no current spline points to draw
+        if (this.splinePoints.length < 2) {
+            // If we have exactly 1 point, draw it
+            if (this.splinePoints.length === 1) {
+                this.splineCtx.fillStyle = this.settings.splineColor;
+                const screenPos = this.worldToScreen(this.splinePoints[0].x, this.splinePoints[0].y);
+                this.splineCtx.beginPath();
+                this.splineCtx.arc(screenPos.x, screenPos.y, 3, 0, 2 * Math.PI);
+                this.splineCtx.fill();
+            }
+            return;
+        }
+        
         this.splineCtx.strokeStyle = this.settings.splineColor;
         this.splineCtx.lineWidth = 2;
         this.splineCtx.lineCap = 'round';
@@ -1056,6 +1096,71 @@ class SplineGenerator {
 
     drawSmoothSpline() {
         const points = this.splinePoints.map(p => this.worldToScreen(p.x, p.y));
+        
+        this.splineCtx.moveTo(points[0].x, points[0].y);
+        
+        for (let i = 1; i < points.length - 1; i++) {
+            const cp1x = points[i].x + (points[i + 1].x - points[i - 1].x) * this.settings.splineSmoothing * 0.2;
+            const cp1y = points[i].y + (points[i + 1].y - points[i - 1].y) * this.settings.splineSmoothing * 0.2;
+            const cp2x = points[i + 1].x - (points[i + 2] ? points[i + 2].x - points[i].x : 0) * this.settings.splineSmoothing * 0.2;
+            const cp2y = points[i + 1].y - (points[i + 2] ? points[i + 2].y - points[i].y : 0) * this.settings.splineSmoothing * 0.2;
+            
+            this.splineCtx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, points[i + 1].x, points[i + 1].y);
+        }
+        
+        if (points.length > 2) {
+            this.splineCtx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+        }
+    }
+
+    drawReferencePath() {
+        if (!this.referencePath || this.referencePath.length < 2) return;
+        
+        // Save current context settings
+        const originalStrokeStyle = this.splineCtx.strokeStyle;
+        const originalLineWidth = this.splineCtx.lineWidth;
+        const originalGlobalAlpha = this.splineCtx.globalAlpha;
+        
+        // Set reference path style (light/transparent)
+        this.splineCtx.strokeStyle = this.settings.splineColor;
+        this.splineCtx.lineWidth = 1;
+        this.splineCtx.globalAlpha = 0.3; // Make it transparent
+        this.splineCtx.setLineDash([5, 5]); // Dashed line
+        
+        this.splineCtx.beginPath();
+        
+        if (this.referencePath.length === 2) {
+            // Simple line for two points
+            const start = this.worldToScreen(this.referencePath[0].x, this.referencePath[0].y);
+            const end = this.worldToScreen(this.referencePath[1].x, this.referencePath[1].y);
+            this.splineCtx.moveTo(start.x, start.y);
+            this.splineCtx.lineTo(end.x, end.y);
+        } else {
+            // Smooth spline for multiple points
+            this.drawSmoothReferenceSpline();
+        }
+        
+        this.splineCtx.stroke();
+        
+        // Draw reference points as small circles
+        this.splineCtx.fillStyle = this.settings.splineColor;
+        this.splineCtx.globalAlpha = 0.2;
+        this.referencePath.forEach(point => {
+            const screenPos = this.worldToScreen(point.x, point.y);
+            this.splineCtx.beginPath();
+            this.splineCtx.arc(screenPos.x, screenPos.y, 2, 0, 2 * Math.PI);
+            this.splineCtx.fill();
+        });
+        
+        // Restore context settings
+        this.splineCtx.strokeStyle = originalStrokeStyle;
+        this.splineCtx.lineWidth = originalLineWidth;
+        this.splineCtx.globalAlpha = originalGlobalAlpha;
+        this.splineCtx.setLineDash([]); // Reset to solid line
+    }
+
+    drawSmoothReferenceSpline() {
+        const points = this.referencePath.map(p => this.worldToScreen(p.x, p.y));
         
         this.splineCtx.moveTo(points[0].x, points[0].y);
         
