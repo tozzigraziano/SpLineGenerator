@@ -1991,35 +1991,9 @@ class SplineGenerator {
         
         const dataStr = JSON.stringify(projectData, null, 2);
         
-        try {
-            // Try using File System Access API (modern browsers)
-            if ('showSaveFilePicker' in window) {
-                const fileHandle = await window.showSaveFilePicker({
-                    suggestedName: `${fileName}.json`,
-                    types: [{
-                        description: 'SpLine Project files',
-                        accept: { 'application/json': ['.json'] }
-                    }]
-                });
-                
-                const writable = await fileHandle.createWritable();
-                await writable.write(dataStr);
-                await writable.close();
-                
-                console.log(`Project saved: ${fileName}.json with ${Object.keys(this.programPaths).length} program paths`);
-                alert('Progetto salvato con successo!');
-            } else {
-                // Fallback to download for older browsers
-                this.downloadFile(dataStr, `${fileName}.json`, 'application/json');
-                console.log(`Project downloaded: ${fileName}.json with ${Object.keys(this.programPaths).length} program paths`);
-            }
-        } catch (error) {
-            if (error.name !== 'AbortError') {
-                // If File System Access fails, fallback to download
-                this.downloadFile(dataStr, `${fileName}.json`, 'application/json');
-                console.log(`Project downloaded (fallback): ${fileName}.json`);
-            }
-        }
+        // Direct download to Downloads folder (no folder selection)
+        this.downloadFile(dataStr, `${fileName}.json`, 'application/json');
+        console.log(`Project downloaded: ${fileName}.json with ${Object.keys(this.programPaths).length} program paths`);
     }
 
     // Helper function for file download
