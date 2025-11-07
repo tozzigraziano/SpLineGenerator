@@ -935,7 +935,24 @@ class SplineGenerator {
             Math.pow(worldPos.y - lastPoint.y, 2)
         );
         
-        // Distance is already in mm since worldPos is in mm
+        // If distance is large (mouse moved quickly), interpolate intermediate points
+        if (distance > this.settings.samplingDistance * 3) {
+            // Calculate how many intermediate points we need
+            const numPoints = Math.ceil(distance / this.settings.samplingDistance);
+            
+            // Add intermediate points
+            for (let i = 1; i < numPoints; i++) {
+                const t = i / numPoints;
+                const interpolatedPoint = {
+                    x: lastPoint.x + (worldPos.x - lastPoint.x) * t,
+                    y: lastPoint.y + (worldPos.y - lastPoint.y) * t,
+                    velocity: 30 // Default velocity for interpolated points
+                };
+                this.splinePoints.push(interpolatedPoint);
+            }
+        }
+        
+        // Always add the current point if it's far enough from the last point
         if (distance >= this.settings.samplingDistance) {
             this.splinePoints.push(worldPos);
             this.drawSpline();
