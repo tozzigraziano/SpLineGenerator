@@ -98,6 +98,10 @@ class SplineGenerator {
         this.selectAllPointsBtn = document.getElementById('selectAllPoints');
         this.bulkVelocityInput = document.getElementById('bulkVelocity');
         this.applyBulkVelocityBtn = document.getElementById('applyBulkVelocity');
+        this.bulkTransformXInput = document.getElementById('bulkX');
+        this.applyapplyBulkXBtn = document.getElementById('applyBulkX');
+        this.bulkTransformYInput = document.getElementById('bulkY');
+        this.applyapplyBulkYBtn = document.getElementById('applyBulkY');
         this.deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
         this.pointCountDisplay = document.getElementById('pointCount');
         this.selectedCountDisplay = document.getElementById('selectedCount');
@@ -340,6 +344,14 @@ class SplineGenerator {
         
         if (this.applyBulkVelocityBtn) {
             this.applyBulkVelocityBtn.addEventListener('click', () => this.applyBulkVelocity());
+        }
+        
+        if (this.applyapplyBulkXBtn) {
+            this.applyapplyBulkXBtn.addEventListener('click', () => this.applyBulkX());
+        }
+        
+        if (this.applyapplyBulkYBtn) {
+            this.applyapplyBulkYBtn.addEventListener('click', () => this.applyBulkY());
         }
         
         if (this.deleteSelectedBtn) {
@@ -663,6 +675,16 @@ class SplineGenerator {
                 headers[2].textContent = `Posizione ${this.settings.xAxisLabel} (mm)`;
                 headers[3].textContent = `Posizione ${this.settings.yAxisLabel} (mm)`;
             }
+        }
+
+        const transfXLabel = document.getElementById('bulkXLabel');
+        if (transfXLabel){
+            transfXLabel.textContent = `Applica trasformazione ${this.settings.xAxisLabel}`
+        }
+
+        const transfYLabel = document.getElementById('bulkYLabel');
+        if (transfYLabel){
+            transfYLabel.textContent = `Applica trasformazione ${this.settings.yAxisLabel}`
         }
     }
 
@@ -1710,6 +1732,74 @@ class SplineGenerator {
         });
         
         // Deselect all points after applying velocity
+        this.selectedPoints.clear();
+        
+        // Update checkboxes in table
+        document.querySelectorAll('.point-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        
+        // Update displays and graphics
+        this.updateSelectedCount();
+        this.updateTableSelection();
+        this.highlightSelectedPoints();
+        this.updateSplineTable();
+        this.bulkVelocityInput.value = '';
+    }
+
+    applyBulkX(){
+        const xValue = parseFloat(this.bulkTransformXInput.value);
+        if (isNaN(xValue) || xValue == 0) {
+            alert('Inserire un valore valido');
+            return;
+        }
+        
+        if (this.selectedPoints.size === 0) {
+            alert('Selezionare almeno un punto');
+            return;
+        }
+
+        this.selectedPoints.forEach(index => {
+            if (index < this.splinePoints.length) {
+                this.splinePoints[index].x += xValue;
+            }
+        });
+        
+        // Deselect all points after applying xValue
+        this.selectedPoints.clear();
+        
+        // Update checkboxes in table
+        document.querySelectorAll('.point-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        
+        // Update displays and graphics
+        this.updateSelectedCount();
+        this.updateTableSelection();
+        this.highlightSelectedPoints();
+        this.updateSplineTable();
+        this.bulkVelocityInput.value = '';
+    }
+
+    applyBulkY(){
+        const yValue = parseFloat(this.bulkTransformYInput.value);
+        if (isNaN(yValue) || yValue == 0) {
+            alert('Inserire un valore valido');
+            return;
+        }
+        
+        if (this.selectedPoints.size === 0) {
+            alert('Selezionare almeno un punto');
+            return;
+        }
+
+        this.selectedPoints.forEach(index => {
+            if (index < this.splinePoints.length) {
+                this.splinePoints[index].y += yValue;
+            }
+        });
+        
+        // Deselect all points after applying xValue
         this.selectedPoints.clear();
         
         // Update checkboxes in table
