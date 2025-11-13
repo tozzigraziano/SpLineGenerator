@@ -11,7 +11,5 @@ DEF {{PROJECT_NAME}}(lp0: IN, lTool: IN, lBase: IN)
     $TOOL=lTool
     $BASE=lBase
     
-    SPLINE
 {{SPLINE_POINTS}}
-    ENDSPLINE
 END

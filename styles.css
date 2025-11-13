@@ -234,7 +234,7 @@ header h1 {
 main {
     flex: 1;
     display: flex;
-    padding: 20px;
+    padding: 10px;
     overflow: hidden;
 }
 
@@ -259,7 +259,7 @@ main {
 
 /* Side Panel */
 .side-panel {
-    width: 450px;
+    width: 100%;
     background: var(--bg-secondary);
     border: 2px solid var(--border-color);
     border-radius: 10px;
@@ -364,6 +364,7 @@ main {
 
 .spline-info, .shapes-info {
     display: flex;
+    align-items: center;
     gap: 15px;
     font-size: 13px;
     color: #666;
@@ -404,7 +405,7 @@ main {
 }
 
 .table-container tr.selected {
-    background: #e3f2fd;
+    background: #5a6268;
 }
 
 .table-container input[type="checkbox"] {
@@ -883,7 +884,7 @@ table td {
 }
 
 table tbody tr:nth-child(even) {
-    background-color: var(--table-stripe) !important;
+    background-color: var(--table-stripe);
 }
 
 table tbody tr:hover {

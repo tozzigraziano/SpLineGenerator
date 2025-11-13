@@ -99,9 +99,12 @@ class SplineGenerator {
         this.bulkVelocityInput = document.getElementById('bulkVelocity');
         this.applyBulkVelocityBtn = document.getElementById('applyBulkVelocity');
         this.bulkTransformXInput = document.getElementById('bulkX');
-        this.applyapplyBulkXBtn = document.getElementById('applyBulkX');
+        this.applySetBulkXBtn = document.getElementById('setBulkX');
+        this.applyOffsetBulkXBtn = document.getElementById('offsetBulkX');
         this.bulkTransformYInput = document.getElementById('bulkY');
-        this.applyapplyBulkYBtn = document.getElementById('applyBulkY');
+        this.applySetBulkYBtn = document.getElementById('setBulkY');
+        this.applyOffsetBulkYBtn = document.getElementById('offsetBulkY');
+        this.addWaitBtn = document.getElementById('addWaitBtn');
         this.deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
         this.pointCountDisplay = document.getElementById('pointCount');
         this.selectedCountDisplay = document.getElementById('selectedCount');
@@ -346,14 +349,26 @@ class SplineGenerator {
             this.applyBulkVelocityBtn.addEventListener('click', () => this.applyBulkVelocity());
         }
         
-        if (this.applyapplyBulkXBtn) {
-            this.applyapplyBulkXBtn.addEventListener('click', () => this.applyBulkX());
+        if (this.applyOffsetBulkXBtn) {
+            this.applyOffsetBulkXBtn.addEventListener('click', () => this.offsetBulkX());
         }
         
-        if (this.applyapplyBulkYBtn) {
-            this.applyapplyBulkYBtn.addEventListener('click', () => this.applyBulkY());
+        if (this.applySetBulkXBtn) {
+            this.applySetBulkXBtn.addEventListener('click', () => this.setBulkX());
         }
         
+        if (this.applyOffsetBulkYBtn) {
+            this.applyOffsetBulkYBtn.addEventListener('click', () => this.offsetBulkY());
+        }
+        
+        if (this.applySetBulkYBtn) {
+            this.applySetBulkYBtn.addEventListener('click', () => this.setBulkY());
+        }
+                
+        if (this.addWaitBtn){
+            this.addWaitBtn.addEventListener('click', () => this.addWait());
+        }
+
         if (this.deleteSelectedBtn) {
             this.deleteSelectedBtn.addEventListener('click', () => this.deleteSelectedPoints());
         }
@@ -679,12 +694,12 @@ class SplineGenerator {
 
         const transfXLabel = document.getElementById('bulkXLabel');
         if (transfXLabel){
-            transfXLabel.textContent = `Applica trasformazione ${this.settings.xAxisLabel}`
+            transfXLabel.textContent = `${this.settings.xAxisLabel} selezionati:`
         }
 
         const transfYLabel = document.getElementById('bulkYLabel');
         if (transfYLabel){
-            transfYLabel.textContent = `Applica trasformazione ${this.settings.yAxisLabel}`
+            transfYLabel.textContent = `${this.settings.yAxisLabel} selezionati:`
         }
     }
 
@@ -1110,15 +1125,20 @@ class SplineGenerator {
         // Draw points
         this.splineCtx.fillStyle = this.settings.splineColor;
         this.splinePoints.forEach(point => {
-            const screenPos = this.worldToScreen(point.x, point.y);
-            this.splineCtx.beginPath();
-            this.splineCtx.arc(screenPos.x, screenPos.y, 3, 0, 2 * Math.PI);
-            this.splineCtx.fill();
+            if (point.type == "wait"){
+
+            }
+            else{
+                const screenPos = this.worldToScreen(point.x, point.y);
+                this.splineCtx.beginPath();
+                this.splineCtx.arc(screenPos.x, screenPos.y, 3, 0, 2 * Math.PI);
+                this.splineCtx.fill();
+            }
         });
     }
 
     drawSmoothSpline() {
-        const points = this.splinePoints.map(p => this.worldToScreen(p.x, p.y));
+        const points = this.splinePoints.filter(p => p.type !== "wait").map(p => this.worldToScreen(p.x, p.y));
         
         this.splineCtx.moveTo(points[0].x, points[0].y);
         
@@ -1316,24 +1336,39 @@ class SplineGenerator {
         this.splineTableBody.innerHTML = '';
         
         this.splinePoints.forEach((point, index) => {
-            if (!point.velocity) point.velocity = 30; // Default velocity in mm/s
             point.id = index + 1; // Always update ID to match current position
-            
+
             const row = document.createElement('tr');
             const isSelected = this.selectedPoints.has(index);
             if (isSelected) row.classList.add('selected');
+
+            if (point.type == "wait"){
+                row.innerHTML = `
+                    <td><input type="checkbox" class="point-checkbox" data-index="${index}" ${isSelected ? 'checked' : ''}></td>
+                    <td>${point.id}</td>
+                    <td colspan="3"><span>Wait (ms) </span><input type="number" class="wait-input" data-index="${index}" value="${point.wait.toFixed(2)}" step="0.1"></td>
+                    <td>
+                        <button class="btn-mini edit" onclick="window.splineApp.focusPoint(${index})">📍</button>
+                        <button class="btn-mini" onclick="window.splineApp.removePoint(${index})">🗑️</button>
+                    </td>
+                `;
+            }
+            else{
+                if (!point.velocity) point.velocity = 30; // Default velocity in mm/s
+                
+                row.innerHTML = `
+                    <td><input type="checkbox" class="point-checkbox" data-index="${index}" ${isSelected ? 'checked' : ''}></td>
+                    <td>${point.id}</td>
+                    <td><input type="number" class="coord-input" data-index="${index}" data-coord="x" value="${point.x.toFixed(2)}" step="0.1"></td>
+                    <td><input type="number" class="coord-input" data-index="${index}" data-coord="y" value="${point.y.toFixed(2)}" step="0.1"></td>
+                    <td><input type="number" class="velocity-input" data-index="${index}" value="${point.velocity}" min="0" step="0.1"></td>
+                    <td>
+                        <button class="btn-mini edit" onclick="window.splineApp.focusPoint(${index})">📍</button>
+                        <button class="btn-mini" onclick="window.splineApp.removePoint(${index})">🗑️</button>
+                    </td>
+                `;
+            }
             
-            row.innerHTML = `
-                <td><input type="checkbox" class="point-checkbox" data-index="${index}" ${isSelected ? 'checked' : ''}></td>
-                <td>${point.id}</td>
-                <td><input type="number" class="coord-input" data-index="${index}" data-coord="x" value="${point.x.toFixed(2)}" step="0.1"></td>
-                <td><input type="number" class="coord-input" data-index="${index}" data-coord="y" value="${point.y.toFixed(2)}" step="0.1"></td>
-                <td><input type="number" class="velocity-input" data-index="${index}" value="${point.velocity}" min="0" step="0.1"></td>
-                <td>
-                    <button class="btn-mini edit" onclick="window.splineApp.focusPoint(${index})">📍</button>
-                    <button class="btn-mini" onclick="window.splineApp.removePoint(${index})">🗑️</button>
-                </td>
-            `;
             this.splineTableBody.appendChild(row);
         });
         
@@ -1747,7 +1782,7 @@ class SplineGenerator {
         this.bulkVelocityInput.value = '';
     }
 
-    applyBulkX(){
+    offsetBulkX(){
         const xValue = parseFloat(this.bulkTransformXInput.value);
         if (isNaN(xValue) || xValue == 0) {
             alert('Inserire un valore valido');
@@ -1781,7 +1816,41 @@ class SplineGenerator {
         this.bulkVelocityInput.value = '';
     }
 
-    applyBulkY(){
+    setBulkX(){
+        const xValue = parseFloat(this.bulkTransformXInput.value);
+        if (isNaN(xValue)) {
+            alert('Inserire un valore valido');
+            return;
+        }
+        
+        if (this.selectedPoints.size === 0) {
+            alert('Selezionare almeno un punto');
+            return;
+        }
+
+        this.selectedPoints.forEach(index => {
+            if (index < this.splinePoints.length) {
+                this.splinePoints[index].x = xValue;
+            }
+        });
+        
+        // Deselect all points after applying xValue
+        this.selectedPoints.clear();
+        
+        // Update checkboxes in table
+        document.querySelectorAll('.point-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        
+        // Update displays and graphics
+        this.updateSelectedCount();
+        this.updateTableSelection();
+        this.highlightSelectedPoints();
+        this.updateSplineTable();
+        this.bulkVelocityInput.value = '';
+    }
+
+    offsetBulkY(){
         const yValue = parseFloat(this.bulkTransformYInput.value);
         if (isNaN(yValue) || yValue == 0) {
             alert('Inserire un valore valido');
@@ -1813,6 +1882,71 @@ class SplineGenerator {
         this.highlightSelectedPoints();
         this.updateSplineTable();
         this.bulkVelocityInput.value = '';
+    }
+
+    setBulkY(){
+        const yValue = parseFloat(this.bulkTransformYInput.value);
+        if (isNaN(yValue)) {
+            alert('Inserire un valore valido');
+            return;
+        }
+        
+        if (this.selectedPoints.size === 0) {
+            alert('Selezionare almeno un punto');
+            return;
+        }
+
+        this.selectedPoints.forEach(index => {
+            if (index < this.splinePoints.length) {
+                this.splinePoints[index].y = yValue;
+            }
+        });
+        
+        // Deselect all points after applying xValue
+        this.selectedPoints.clear();
+        
+        // Update checkboxes in table
+        document.querySelectorAll('.point-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        
+        // Update displays and graphics
+        this.updateSelectedCount();
+        this.updateTableSelection();
+        this.highlightSelectedPoints();
+        this.updateSplineTable();
+        this.bulkVelocityInput.value = '';
+    }
+
+    addWait() {
+        if (this.selectedPoints.size !== 1) {
+            alert('Selezionare un punto');
+            return;
+        }
+
+        const index = this.selectedPoints.values().next().value + 1;
+
+        const waitPoint = {
+            type: "wait",
+            x: 0,
+            y: 0,
+            velocity: 0,
+            wait: 100
+        };
+        this.splinePoints.splice(index, 0, waitPoint);
+
+        // Update displays and graphics
+        this.updateSelectedCount();
+        this.updateSplineTable();
+        this.highlightSelectedPoints();
+        this.drawSpline();
+        this.updateSplineLength();
+        this.updatePointCount();
+        
+        // Save current path data
+        this.saveCurrentPathToIndex();
+        
+        console.log(`Added wait at index ${index}`);
     }
 
     deleteSelectedPoints() {
@@ -3088,9 +3222,7 @@ ENDDAT`,
     $TOOL=lTool
     $BASE=lBase
     
-    SPLINE
 {{SPLINE_POINTS}}
-    ENDSPLINE
 END`
         };
     }
@@ -3103,8 +3235,8 @@ END`
             }
             
             const [datResponse, srcResponse] = await Promise.all([
-                fetch('./templates/kuka_template.dat'),
-                fetch('./templates/kuka_template.src')
+                fetch('./templates/kuka_template.dat?v3.7'),
+                fetch('./templates/kuka_template.src?v3.7')
             ]);
             
             if (!datResponse.ok || !srcResponse.ok) {
@@ -3122,13 +3254,19 @@ END`
     }
     
     generateKukaDatFromTemplate(projectName, template) {
-        const numPoints = this.splinePoints.length;
+        const numPoints = this.splinePoints.filter(p => p.type !== "wait").length;
         
-        // Generate FRAME positions using axis labels
+        // Generate FRAME positions using axis labels and MOVE positions (all zeros)
         let framePositions = '';
+        let movePositions = '';
+        let splinePointIndex = 1;
         for (let i = 0; i < this.splinePoints.length; i++) {
             const point = this.splinePoints[i];
             
+            if (point.wait) {
+                continue; // ignore wait point
+            }
+
             // Use the configured axis labels
             const xAxisLabel = this.settings.xAxisLabel || 'X';
             const yAxisLabel = this.settings.yAxisLabel || 'Y';
@@ -3154,13 +3292,10 @@ END`
                 kukaZ = point.y;
             }
             
-            framePositions += `pSpl[${i + 1}]={X ${kukaX.toFixed(1)},Y ${kukaY.toFixed(1)},Z ${kukaZ.toFixed(1)},A 0.0,B 0.0,C 0.0}\n`;
-        }
-        
-        // Generate MOVE positions (all zeros)
-        let movePositions = '';
-        for (let i = 0; i < this.splinePoints.length; i++) {
-            movePositions += `pMove[${i + 1}]={X 0.0,Y 0.0,Z 0.0,A 0.0,B 0.0,C 0.0,S 0,T 0,E1 0.0,E2 0.0,E3 0.0,E4 0.0,E5 0.0,E6 0.0}\n`;
+            framePositions += `pSpl[${splinePointIndex}]={X ${kukaX.toFixed(1)},Y ${kukaY.toFixed(1)},Z ${kukaZ.toFixed(1)},A 0.0,B 0.0,C 0.0}\n`;
+            movePositions += `pMove[${splinePointIndex}]={X 0.0,Y 0.0,Z 0.0,A 0.0,B 0.0,C 0.0,S 0,T 0,E1 0.0,E2 0.0,E3 0.0,E4 0.0,E5 0.0,E6 0.0}\n`;
+
+            splinePointIndex ++;
         }
         
         // Replace template variables
@@ -3172,20 +3307,34 @@ END`
     }
     
     generateKukaSrcFromTemplate(projectName, template) {
-        const numPoints = this.splinePoints.length;
+        const numPoints = this.splinePoints.filter(p => p.type !== "wait").length;
         
         // Generate spline points
         let splinePoints = '';
+        let firstSplinePoint = true;
+        let splinePointIndex = 1;
         for (let i = 0; i < this.splinePoints.length; i++) {
             const point = this.splinePoints[i];
             const velocity = (point.velocity || 30) / 1000; // Convert mm/s to m/s
             
-            if (i === 0) {
-                splinePoints += `        SPL pMove[${i + 1}] WITH $ORI_TYPE = #CONSTANT, $VEL = {CP ${velocity.toFixed(3)},ORI1 45.0000,ORI2 45.0000}\n`;
-            } else {
-                splinePoints += `        SPL pMove[${i + 1}] WITH $VEL = {CP ${velocity.toFixed(3)},ORI1 45.0000,ORI2 45.0000}\n`;
+            if (point.wait){
+                splinePoints += '    ENDSPLINE\n';
+                splinePoints += `    WAIT SEC ${(point.wait / 1000).toFixed(3)}\n`; // Convert ms to sec
+                firstSplinePoint = true;
+            }
+            else{
+                if (firstSplinePoint) {
+                    splinePoints += '    SPLINE\n';
+                    splinePoints += `        SPL pMove[${splinePointIndex}] WITH $ORI_TYPE = #CONSTANT, $VEL = {CP ${velocity.toFixed(3)},ORI1 45.0000,ORI2 45.0000}\n`;
+                } else {
+                    splinePoints += `        SPL pMove[${splinePointIndex}] WITH $VEL = {CP ${velocity.toFixed(3)},ORI1 45.0000,ORI2 45.0000}\n`;
+                }
+                firstSplinePoint = false;
+
+                splinePointIndex ++;
             }
         }
+        splinePoints += '    ENDSPLINE\n';
         
         // Replace template variables
         return template
