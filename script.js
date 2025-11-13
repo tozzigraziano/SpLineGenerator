@@ -1420,6 +1420,28 @@ class SplineGenerator {
             });
         });
         
+        // Add event listeners for wait inputs
+        document.querySelectorAll('.wait-input').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                const value = parseFloat(e.target.value);
+                
+                if (!isNaN(value)) {
+                    // Update the point coordinates
+                    this.splinePoints[index].wait = value;
+                }
+            });
+            
+            // Add input validation on blur
+            input.addEventListener('blur', (e) => {
+                const value = parseFloat(e.target.value);
+                if (isNaN(value) || value < 0) {
+                    const index = parseInt(e.target.dataset.index);
+                    e.target.value = this.splinePoints[index].wait || 0;
+                }
+            });
+        });
+
         // Add event listeners for checkboxes with shift selection
         document.querySelectorAll('.point-checkbox').forEach(checkbox => {
             checkbox.addEventListener('click', (e) => this.handlePointSelection(e));
@@ -1931,7 +1953,7 @@ class SplineGenerator {
             x: 0,
             y: 0,
             velocity: 0,
-            wait: 100
+            wait: 1000
         };
         this.splinePoints.splice(index, 0, waitPoint);
 
