@@ -126,6 +126,32 @@ header h1 {
     color: rgba(255,255,255,0.7);
 }
 
+.description-group {
+    display: flex;
+    flex-direction: column;
+    padding: 5px 10px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+}
+
+.description-group label {
+    margin-bottom: 4px;
+}
+
+.description-group textarea {
+    transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.description-group textarea:focus {
+    outline: none;
+    border-color: rgba(255,255,255,0.6) !important;
+    background: rgba(255,255,255,0.3) !important;
+}
+
+.description-group textarea::placeholder {
+    color: rgba(255,255,255,0.5);
+}
+
 .export-group {
     display: flex;
     align-items: center;
@@ -967,6 +993,25 @@ header {
 
 .file-group input[type="text"]::placeholder {
     color: rgba(255,255,255,0.7) !important;
+}
+
+.description-group {
+    background: rgba(255,255,255,0.1) !important;
+}
+
+.description-group textarea {
+    background: rgba(255,255,255,0.2) !important;
+    color: var(--header-text) !important;
+    border: 1px solid rgba(255,255,255,0.3) !important;
+}
+
+.description-group textarea:focus {
+    background: rgba(255,255,255,0.3) !important;
+    border-color: rgba(255,255,255,0.6) !important;
+}
+
+.description-group textarea::placeholder {
+    color: rgba(255,255,255,0.5) !important;
 }
 
 .robot-select {

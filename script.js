@@ -88,6 +88,7 @@ class SplineGenerator {
         this.programBasename = document.getElementById('programBasename');
         this.programIndex = document.getElementById('programIndex');
         this.copyBtn = document.getElementById('copyBtn');
+        this.programDescription = document.getElementById('programDescription');
         
         // Dark mode button
         this.darkModeBtn = document.getElementById('darkModeBtn');
@@ -297,6 +298,12 @@ class SplineGenerator {
         // Copy program button
         if (this.copyBtn) {
             this.copyBtn.addEventListener('click', () => this.showCopyDialog());
+        }
+        
+        // Program description change
+        if (this.programDescription) {
+            this.programDescription.addEventListener('input', () => this.saveCurrentDescription());
+            this.programDescription.addEventListener('blur', () => this.saveCurrentDescription());
         }
         
         // Canvas events
@@ -2256,12 +2263,18 @@ class SplineGenerator {
                     
                     this.programPaths[legacyIndex] = {
                         splinePoints: projectData.splinePoints || [],
-                        shapes: projectData.shapes || []
+                        shapes: projectData.shapes || [],
+                        description: ''
                     };
                     
                     this.currentProgramIndex = legacyIndex;
                     this.splinePoints = projectData.splinePoints || [];
                     this.shapes = projectData.shapes || [];
+                    
+                    // Clear description for legacy projects
+                    if (this.programDescription) {
+                        this.programDescription.value = '';
+                    }
                     
                     // Set program index selector
                     if (this.programIndex) {
@@ -2361,7 +2374,8 @@ class SplineGenerator {
         // Deep copy current program data
         const currentData = {
             splinePoints: JSON.parse(JSON.stringify(this.splinePoints)),
-            shapes: JSON.parse(JSON.stringify(this.shapes))
+            shapes: JSON.parse(JSON.stringify(this.shapes)),
+            description: this.programDescription ? this.programDescription.value : ''
         };
         
         // Save to target slot
@@ -2531,14 +2545,33 @@ class SplineGenerator {
     // Save current path to the selected program index
     saveCurrentPathToIndex() {
         const programIndex = this.currentProgramIndex || 1;
+        const description = this.programDescription ? this.programDescription.value : '';
         this.programPaths[programIndex] = {
             splinePoints: [...this.splinePoints],
-            shapes: [...this.shapes]
+            shapes: [...this.shapes],
+            description: description
         };
         console.log(`Path saved to program index ${programIndex}`, {
             splinePoints: this.splinePoints.length,
-            shapes: this.shapes.length
+            shapes: this.shapes.length,
+            description: description
         });
+    }
+    
+    // Save current description
+    saveCurrentDescription() {
+        const programIndex = this.currentProgramIndex || 1;
+        const description = this.programDescription ? this.programDescription.value : '';
+        if (!this.programPaths[programIndex]) {
+            this.programPaths[programIndex] = {
+                splinePoints: [],
+                shapes: [],
+                description: description
+            };
+        } else {
+            this.programPaths[programIndex].description = description;
+        }
+        console.log(`Description saved for program ${programIndex}`);
     }
 
     // Load path from the selected program index
@@ -2555,15 +2588,26 @@ class SplineGenerator {
             this.splinePoints = [...this.programPaths[targetIndex].splinePoints];
             this.shapes = [...this.programPaths[targetIndex].shapes];
             
+            // Load description
+            if (this.programDescription) {
+                this.programDescription.value = this.programPaths[targetIndex].description || '';
+            }
+            
             console.log(`Path loaded from program index ${targetIndex}`, {
                 splinePointsLoaded: this.splinePoints.length,
                 shapesLoaded: this.shapes.length,
+                description: this.programPaths[targetIndex].description,
                 allSavedPaths: Object.keys(this.programPaths)
             });
         } else {
             // Initialize empty path for new index
             this.splinePoints = [];
             this.shapes = [];
+            
+            // Clear description
+            if (this.programDescription) {
+                this.programDescription.value = '';
+            }
             
             console.log(`New empty path created for program index ${targetIndex}`);
         }
@@ -3205,9 +3249,12 @@ class SplineGenerator {
                 const originalPoints = this.splinePoints;
                 this.splinePoints = program.pathData.splinePoints;
                 
+                // Get description for this program
+                const description = program.pathData.description || '';
+                
                 // Generate files content for this program
                 const datContent = this.generateKukaDatFromTemplate(program.name, templates.dat);
-                const srcContent = this.generateKukaSrcFromTemplate(program.name, templates.src);
+                const srcContent = this.generateKukaSrcFromTemplate(program.name, templates.src, description);
                 
                 // Restore original points
                 this.splinePoints = originalPoints;
@@ -3387,8 +3434,19 @@ END`
             .replace(/\{\{MOVE_POSITIONS\}\}/g, movePositions.trim());
     }
     
-    generateKukaSrcFromTemplate(projectName, template) {
+    generateKukaSrcFromTemplate(projectName, template, description = '') {
         const numPoints = this.splinePoints.filter(p => p.type !== "wait").length;
+        
+        // Generate description comment if available
+        let descriptionComment = '';
+        if (description && description.trim()) {
+            const lines = description.trim().split('\n');
+            descriptionComment = '; Description:\n';
+            lines.forEach(line => {
+                descriptionComment += `; ${line}\n`;
+            });
+            descriptionComment += ';\n';
+        }
         
         // Generate spline points
         let splinePoints = '';
@@ -3411,10 +3469,21 @@ END`
         splinePoints += '    ENDSPLINE\n';
         
         // Replace template variables
-        return template
+        let result = template
             .replace(/\{\{PROJECT_NAME\}\}/g, projectName)
             .replace(/\{\{NUM_POINTS\}\}/g, numPoints.toString())
             .replace(/\{\{SPLINE_POINTS\}\}/g, splinePoints.trim());
+        
+        // Insert description comment after the first line (DEF line)
+        if (descriptionComment) {
+            const lines = result.split('\n');
+            if (lines.length > 0) {
+                lines.splice(1, 0, descriptionComment.trimEnd());
+                result = lines.join('\n');
+            }
+        }
+        
+        return result;
     }
     
     generateKukaDatFile(projectName) {
