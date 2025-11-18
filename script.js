@@ -3099,8 +3099,17 @@ class SplineGenerator {
     
     // Robot code export methods
     exportRobotCode() {
-        if (this.splinePoints.length < 2) {
-            alert('Aggiungi almeno 2 punti alla spline per esportare!');
+        // Save current path before checking
+        this.saveCurrentPathToIndex();
+        
+        // Check if there are any programs with data
+        const hasAnyData = Object.keys(this.programPaths).some(key => {
+            const path = this.programPaths[key];
+            return path && path.splinePoints && path.splinePoints.length >= 2;
+        });
+        
+        if (!hasAnyData) {
+            alert('Aggiungi almeno 2 punti alla spline in almeno un programma per esportare!');
             return;
         }
         
@@ -3128,13 +3137,6 @@ class SplineGenerator {
         // Save current path before exporting
         this.saveCurrentPathToIndex();
         
-        // Get current program name from settings and index
-        const programIndex = this.programIndex ? this.programIndex.value : '1';
-        let projectName = `${this.settings.basename}${programIndex}`;
-        
-        // Ensure valid filename for KUKA (only letters, numbers, underscore)
-        projectName = projectName.replace(/[^a-zA-Z0-9_]/g, '_');
-        
         try {
             // Load templates
             let templates;
@@ -3145,10 +3147,6 @@ class SplineGenerator {
                 console.log('Using embedded templates (templates folder not accessible)');
                 templates = this.getEmbeddedKukaTemplates();
             }
-            
-            // Generate files content
-            const datContent = this.generateKukaDatFromTemplate(projectName, templates.dat);
-            const srcContent = this.generateKukaSrcFromTemplate(projectName, templates.src);
             
             // Generate project JSON
             const timestamp = this.generateTimestamp();
@@ -3161,12 +3159,79 @@ class SplineGenerator {
             };
             const projectContent = JSON.stringify(projectData, null, 2);
             
-            // Create ZIP file using JSZip
-            await this.createAndDownloadZip(projectName, datContent, srcContent, projectContent, timestamp);
+            // Collect all programs to export
+            const programsToExport = [];
+            for (const [index, pathData] of Object.entries(this.programPaths)) {
+                if (pathData && pathData.splinePoints && pathData.splinePoints.length >= 2) {
+                    let projectName = `${this.settings.basename}${index}`;
+                    // Ensure valid filename for KUKA (only letters, numbers, underscore)
+                    projectName = projectName.replace(/[^a-zA-Z0-9_]/g, '_');
+                    
+                    programsToExport.push({
+                        index: index,
+                        name: projectName,
+                        pathData: pathData
+                    });
+                }
+            }
+            
+            if (programsToExport.length === 0) {
+                alert('Nessun programma valido da esportare!');
+                return;
+            }
+            
+            // Create ZIP file with all programs
+            await this.createAndDownloadZipAllPrograms(programsToExport, templates, projectContent, timestamp);
             
         } catch (error) {
             console.error('Error during KUKA export:', error);
             alert('Errore durante l\'esportazione: ' + error.message);
+        }
+    }
+
+    async createAndDownloadZipAllPrograms(programsToExport, templates, projectContent, timestamp) {
+        try {
+            // Check if JSZip is available
+            if (typeof JSZip === 'undefined') {
+                alert('Libreria JSZip non disponibile. Impossibile creare il file ZIP.');
+                return;
+            }
+
+            const zip = new JSZip();
+            
+            // Add all programs to ZIP
+            for (const program of programsToExport) {
+                // Temporarily set splinePoints to generate code for this specific program
+                const originalPoints = this.splinePoints;
+                this.splinePoints = program.pathData.splinePoints;
+                
+                // Generate files content for this program
+                const datContent = this.generateKukaDatFromTemplate(program.name, templates.dat);
+                const srcContent = this.generateKukaSrcFromTemplate(program.name, templates.src);
+                
+                // Restore original points
+                this.splinePoints = originalPoints;
+                
+                // Add to ZIP
+                zip.file(`${program.name}.dat`, datContent);
+                zip.file(`${program.name}.src`, srcContent);
+            }
+            
+            // Add project JSON to ZIP
+            zip.file(`${this.settings.basename}_project_${timestamp}.json`, projectContent);
+            
+            // Generate ZIP blob
+            const zipBlob = await zip.generateAsync({type: "blob"});
+            
+            // Direct download to Downloads folder
+            const zipName = `${this.settings.basename}_all_programs_${timestamp}.zip`;
+            this.downloadFile(zipBlob, zipName, 'application/zip');
+            
+            console.log(`Exported ${programsToExport.length} program(s) to ${zipName}`);
+            
+        } catch (error) {
+            console.error('Error creating ZIP:', error);
+            alert('Errore durante la creazione del file ZIP: ' + error.message);
         }
     }
 
