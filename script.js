@@ -87,6 +87,7 @@ class SplineGenerator {
         // Program naming elements
         this.programBasename = document.getElementById('programBasename');
         this.programIndex = document.getElementById('programIndex');
+        this.copyBtn = document.getElementById('copyBtn');
         
         // Dark mode button
         this.darkModeBtn = document.getElementById('darkModeBtn');
@@ -291,6 +292,11 @@ class SplineGenerator {
             this.programIndex.addEventListener('change', (e) => {
                 this.loadPathFromIndex(e.target.value);
             });
+        }
+        
+        // Copy program button
+        if (this.copyBtn) {
+            this.copyBtn.addEventListener('click', () => this.showCopyDialog());
         }
         
         // Canvas events
@@ -2293,6 +2299,75 @@ class SplineGenerator {
 
     closeSettings() {
         this.settingsModal.style.display = 'none';
+    }
+
+    showCopyDialog() {
+        const currentIndex = this.currentProgramIndex;
+        const maxNum = this.settings.maxProgramNum;
+        
+        // Build list of available slots
+        const availableSlots = [];
+        for (let i = 1; i <= maxNum; i++) {
+            if (i !== currentIndex) {
+                availableSlots.push(i);
+            }
+        }
+        
+        // Create a simple prompt with available slots
+        let message = `Copia il programma ${currentIndex} nello slot:\n\n`;
+        message += `Inserisci un numero da 1 a ${maxNum} (eccetto ${currentIndex}):`;
+        
+        const targetSlot = prompt(message);
+        
+        if (targetSlot === null) {
+            // User cancelled
+            return;
+        }
+        
+        const targetIndex = parseInt(targetSlot);
+        
+        // Validate input
+        if (isNaN(targetIndex) || targetIndex < 1 || targetIndex > maxNum) {
+            alert(`Numero non valido. Inserisci un numero da 1 a ${maxNum}.`);
+            return;
+        }
+        
+        if (targetIndex === currentIndex) {
+            alert('Non puoi copiare un programma su se stesso!');
+            return;
+        }
+        
+        // Check if target slot has content
+        const targetHasContent = this.programPaths[targetIndex] && 
+            (this.programPaths[targetIndex].splinePoints?.length > 0 || 
+             this.programPaths[targetIndex].shapes?.length > 0);
+        
+        if (targetHasContent) {
+            const overwrite = confirm(`Lo slot ${targetIndex} contiene già un programma. Vuoi sovrascriverlo?`);
+            if (!overwrite) {
+                return;
+            }
+        }
+        
+        // Perform the copy
+        this.copyProgramToSlot(targetIndex);
+        
+        alert(`Programma copiato con successo nello slot ${targetIndex}!`);
+    }
+
+    copyProgramToSlot(targetIndex) {
+        const currentIndex = this.currentProgramIndex;
+        
+        // Deep copy current program data
+        const currentData = {
+            splinePoints: JSON.parse(JSON.stringify(this.splinePoints)),
+            shapes: JSON.parse(JSON.stringify(this.shapes))
+        };
+        
+        // Save to target slot
+        this.programPaths[targetIndex] = currentData;
+        
+        console.log(`Program copied from slot ${currentIndex} to slot ${targetIndex}`);
     }
 
     updateCanvasScaling() {
