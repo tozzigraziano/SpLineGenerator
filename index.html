@@ -28,10 +28,6 @@
                     <button id="loadBtn" class="btn"><span class="material-symbols-outlined">folder_open</span> Carica Progetto</button>
                     <input type="file" id="fileInput" accept=".json" style="display: none;">
                 </div>
-                <div class="description-group" style="margin-top: 8px; width: 100%;">
-                    <label for="programDescription" style="color: rgba(255,255,255,0.9); font-size: 13px; margin-right: 8px; display: block; margin-bottom: 4px;">Descrizione slot:</label>
-                    <textarea id="programDescription" placeholder="Inserisci una descrizione per questo programma..." style="width: 100%; max-width: 600px; min-height: 50px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; background: rgba(255,255,255,0.2); color: white; font-size: 13px; font-family: inherit; resize: vertical;"></textarea>
-                </div>
                 <div class="export-group">
                     <select id="robotType" class="robot-select">
                         <option value="kuka">KUKA KRL</option>
@@ -77,6 +73,10 @@
                 
                 <div id="sidePanel" class="side-panel">
                     <div class="panel-header">
+                        <div class="description-panel-group">
+                            <label for="programDescription" style="font-size: 13px; margin-bottom: 6px; display: block; font-weight: 500;">Descrizione programma:</label>
+                            <textarea id="programDescription" placeholder="Inserisci una descrizione per questo programma..." style="width: 100%; min-height: 60px; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary); font-size: 13px; font-family: inherit; resize: vertical; margin-bottom: 12px;"></textarea>
+                        </div>
                         <div class="tab-container">
                             <button class="tab-btn active" data-tab="spline-tab">📏 Punti Spline</button>
                             <button class="tab-btn" data-tab="shapes-tab">📐 Geometrie</button>
