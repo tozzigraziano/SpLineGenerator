@@ -1512,21 +1512,20 @@ class SplineGenerator {
             });
         });
         
-        // Add hover highlight functionality
-        const highlightCheckbox = document.getElementById('highlightSequencesOnHover');
-        if (highlightCheckbox && highlightCheckbox.checked) {
-            document.querySelectorAll('.sequence-card').forEach(card => {
-                card.addEventListener('mouseenter', (e) => {
-                    const seqIndex = parseInt(e.currentTarget.dataset.seqIndex);
-                    this.highlightSequenceInTable(seqIndex, true);
-                });
-                
-                card.addEventListener('mouseleave', (e) => {
-                    const seqIndex = parseInt(e.currentTarget.dataset.seqIndex);
-                    this.highlightSequenceInTable(seqIndex, false);
-                });
+        // Add hover highlight functionality for sequence cards
+        document.querySelectorAll('.sequence-card').forEach(card => {
+            card.addEventListener('mouseenter', (e) => {
+                const seqIndex = parseInt(e.currentTarget.dataset.seqIndex);
+                this.highlightSequenceInTable(seqIndex, true);
+                this.highlightSequenceOnCanvas(seqIndex);
             });
-        }
+            
+            card.addEventListener('mouseleave', (e) => {
+                const seqIndex = parseInt(e.currentTarget.dataset.seqIndex);
+                this.highlightSequenceInTable(seqIndex, false);
+                this.clearSequenceHighlightOnCanvas();
+            });
+        });
     }
     
     // Update velocity for all points in a sequence
@@ -1639,6 +1638,20 @@ class SplineGenerator {
             `;
         
             this.splineTableBody.appendChild(row);
+        });
+        
+        // Add hover event listeners for sequence rows
+        document.querySelectorAll('.sequence-row').forEach(row => {
+            row.addEventListener('mouseenter', (e) => {
+                const seqIndex = parseInt(e.currentTarget.dataset.sequenceIndex);
+                if (!isNaN(seqIndex)) {
+                    this.highlightSequenceOnCanvas(seqIndex);
+                }
+            });
+            
+            row.addEventListener('mouseleave', () => {
+                this.clearSequenceHighlightOnCanvas();
+            });
         });
         
         // Add event listeners for velocity inputs
@@ -1978,6 +1991,71 @@ class SplineGenerator {
             
             this.splineCtx.restore();
         }
+    }
+
+    highlightSequenceOnCanvas(seqIndex) {
+        const sequences = this.identifySequences();
+        if (seqIndex < 0 || seqIndex >= sequences.length) return;
+        
+        const sequence = sequences[seqIndex];
+        
+        // Redraw to clear previous highlights
+        this.drawSpline();
+        
+        // Draw highlight for sequence points
+        this.splineCtx.save();
+        this.splineCtx.strokeStyle = '#667eea';
+        this.splineCtx.fillStyle = '#667eea';
+        this.splineCtx.lineWidth = 2;
+        
+        sequence.points.forEach(index => {
+            if (index < this.splinePoints.length) {
+                const point = this.splinePoints[index];
+                const screenPos = this.worldToScreen(point.x, point.y);
+                
+                // Draw highlight ring
+                this.splineCtx.beginPath();
+                this.splineCtx.arc(screenPos.x, screenPos.y, 10, 0, 2 * Math.PI);
+                this.splineCtx.stroke();
+                
+                // Draw filled center
+                this.splineCtx.beginPath();
+                this.splineCtx.arc(screenPos.x, screenPos.y, 5, 0, 2 * Math.PI);
+                this.splineCtx.fill();
+            }
+        });
+        
+        this.splineCtx.restore();
+        
+        // Re-highlight selected points if any
+        if (this.selectedPoints.size > 0) {
+            this.splineCtx.save();
+            this.splineCtx.strokeStyle = '#ff6600';
+            this.splineCtx.fillStyle = '#ff6600';
+            this.splineCtx.lineWidth = 3;
+            
+            this.selectedPoints.forEach(index => {
+                if (index < this.splinePoints.length) {
+                    const point = this.splinePoints[index];
+                    const screenPos = this.worldToScreen(point.x, point.y);
+                    
+                    this.splineCtx.beginPath();
+                    this.splineCtx.arc(screenPos.x, screenPos.y, 8, 0, 2 * Math.PI);
+                    this.splineCtx.stroke();
+                    
+                    this.splineCtx.beginPath();
+                    this.splineCtx.arc(screenPos.x, screenPos.y, 4, 0, 2 * Math.PI);
+                    this.splineCtx.fill();
+                }
+            });
+            
+            this.splineCtx.restore();
+        }
+    }
+
+    clearSequenceHighlightOnCanvas() {
+        this.drawSpline();
+        this.highlightSelectedPoints();
     }
 
     updateSelectedCount() {
