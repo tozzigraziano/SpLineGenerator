@@ -1442,17 +1442,17 @@ class SplineGenerator {
             sequenceCard.className = 'sequence-card';
             sequenceCard.dataset.seqIndex = seqIndex;
             
-            // Calculate sequence length
+            // Calculate sequence length and duration using spline curve sampling
             let sequenceLength = 0;
-            for (let i = seq.startIndex; i < seq.endIndex; i++) {
-                const p1 = this.splinePoints[i];
-                const p2 = this.splinePoints[i + 1];
-                const dx = p2.x - p1.x;
-                const dy = p2.y - p1.y;
-                sequenceLength += Math.sqrt(dx * dx + dy * dy);
-            }
+            let duration = 0;
             
-            const duration = sequenceLength / seq.velocity; // seconds
+            for (let i = seq.startIndex; i < seq.endIndex; i++) {
+                const velocity = this.splinePoints[i].velocity || 30;
+                // Use the same method as animation for consistency
+                const segmentLength = this.calculateSplineSegmentLength(i);
+                sequenceLength += segmentLength;
+                duration += segmentLength / velocity; // seconds
+            }
             
             sequenceCard.innerHTML = `
                 <div class="sequence-header">
@@ -3115,15 +3115,9 @@ class SplineGenerator {
         
         let totalTime = 0;
         for (let i = 0; i < this.splinePoints.length - 1; i++) {
-            const p1 = this.splinePoints[i];
-            const p2 = this.splinePoints[i + 1];
-            
-            const distance = Math.sqrt(
-                Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
-            );
-            
-            const velocity = p1.velocity || 30; // mm/s
-            totalTime += distance / velocity; // seconds
+            const velocity = this.splinePoints[i].velocity || 30; // mm/s
+            const segmentLength = this.calculateSplineSegmentLength(i);
+            totalTime += segmentLength / velocity; // seconds
         }
         
         return totalTime * 1000; // Convert to milliseconds
