@@ -79,6 +79,7 @@
                         </div>
                         <div class="tab-container">
                             <button class="tab-btn active" data-tab="spline-tab">📏 Punti Spline</button>
+                            <button class="tab-btn" data-tab="sequences-tab">🎯 Sequenze</button>
                             <button class="tab-btn" data-tab="shapes-tab">📐 Geometrie</button>
                         </div>
                     </div>
@@ -107,6 +108,9 @@
                                 <div class="spline-info">
                                     <span id="pointCount">0 punti</span>
                                     <span id="selectedCount">0 selezionati</span>
+                                    <button id="selectSequenceBtn" class="btn btn-small" title="Seleziona sequenza corrente con stessa velocità">
+                                        <span class="material-symbols-outlined">select_all</span> Seleziona Sequenza
+                                    </button>
                                     <button id="deleteSelectedBtn" class="btn btn-small btn-danger" style="display: none;">
                                         <span class="material-symbols-outlined">delete</span> Elimina selezionati
                                     </button>
@@ -130,6 +134,28 @@
                                         <!-- Punti spline verranno inseriti qui -->
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Tab Sequenze -->
+                        <div id="sequences-tab" class="tab-content">
+                            <div class="tab-toolbar">
+                                <div class="sequences-info">
+                                    <span id="sequencesCount">0 sequenze</span>
+                                    <button id="refreshSequencesBtn" class="btn btn-small">
+                                        <span class="material-symbols-outlined">refresh</span> Aggiorna
+                                    </button>
+                                    <label style="margin-left: 20px;">
+                                        <input type="checkbox" id="highlightSequencesOnHover" checked>
+                                        Evidenzia al passaggio del mouse
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="table-container">
+                                <div id="sequencesContainer">
+                                    <!-- Sequenze verranno inserite qui -->
+                                </div>
                             </div>
                         </div>
                         

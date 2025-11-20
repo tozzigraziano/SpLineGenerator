@@ -111,6 +111,10 @@ class SplineGenerator {
         this.selectedCountDisplay = document.getElementById('selectedCount');
         this.shapesCountDisplay = document.getElementById('shapesCount');
         this.splineLengthDisplay = document.getElementById('splineLength');
+        this.selectSequenceBtn = document.getElementById('selectSequenceBtn');
+        this.sequencesContainer = document.getElementById('sequencesContainer');
+        this.sequencesCountDisplay = document.getElementById('sequencesCount');
+        this.refreshSequencesBtn = document.getElementById('refreshSequencesBtn');
         
         console.log('Elements initialized successfully');
     }
@@ -391,6 +395,16 @@ class SplineGenerator {
                     this.clearSelection();
                 }
             });
+        }
+        
+        // Sequence selection button
+        if (this.selectSequenceBtn) {
+            this.selectSequenceBtn.addEventListener('click', () => this.selectCurrentSequence());
+        }
+        
+        // Refresh sequences button
+        if (this.refreshSequencesBtn) {
+            this.refreshSequencesBtn.addEventListener('click', () => this.updateSequencesView());
         }
         
         // Settings inputs
@@ -685,6 +699,7 @@ class SplineGenerator {
         if (splineTable) {
             const headers = splineTable.querySelectorAll('thead th');
             if (headers.length >= 4) {
+                // Index 0: checkbox, 1: ID, 2: Z/X, 3: X/Y, 4: Velocity, 5: Actions
                 headers[2].textContent = `${this.settings.xAxisLabel} (mm)`;
                 headers[3].textContent = `${this.settings.yAxisLabel} (mm)`;
             }
@@ -1331,12 +1346,269 @@ class SplineGenerator {
         // Update tab content
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
+        
+        // Update sequences view when switching to sequences tab
+        if (tabId === 'sequences-tab') {
+            this.updateSequencesView();
+        }
+    }
+
+    // Identify velocity sequences in spline points
+    identifySequences() {
+        const sequences = [];
+        if (this.splinePoints.length === 0) return sequences;
+        
+        let currentSequence = {
+            startIndex: 0,
+            endIndex: 0,
+            velocity: this.splinePoints[0].velocity || 30,
+            points: [0]
+        };
+        
+        for (let i = 1; i < this.splinePoints.length; i++) {
+            const currentVelocity = this.splinePoints[i].velocity || 30;
+            
+            if (Math.abs(currentVelocity - currentSequence.velocity) < 0.01) {
+                // Same velocity, extend current sequence
+                currentSequence.endIndex = i;
+                currentSequence.points.push(i);
+            } else {
+                // Different velocity, save current sequence and start new one
+                sequences.push(currentSequence);
+                currentSequence = {
+                    startIndex: i,
+                    endIndex: i,
+                    velocity: currentVelocity,
+                    points: [i]
+                };
+            }
+        }
+        
+        // Add last sequence
+        sequences.push(currentSequence);
+        
+        return sequences;
+    }
+    
+    // Select current sequence based on selected points
+    selectCurrentSequence() {
+        if (this.selectedPoints.size === 0) {
+            alert('Seleziona almeno un punto per identificare la sequenza!');
+            return;
+        }
+        
+        // Get the first selected point
+        const firstSelected = Math.min(...Array.from(this.selectedPoints));
+        const targetVelocity = this.splinePoints[firstSelected].velocity || 30;
+        
+        // Find the sequence containing this point
+        const sequences = this.identifySequences();
+        const sequence = sequences.find(seq => seq.points.includes(firstSelected));
+        
+        if (sequence) {
+            // Clear current selection
+            this.selectedPoints.clear();
+            
+            // Select all points in the sequence
+            sequence.points.forEach(index => {
+                this.selectedPoints.add(index);
+            });
+            
+            this.updateSplineTable();
+            this.updateSelectionInfo();
+            this.highlightSelectedPoints();
+            
+            console.log(`Selected sequence with velocity ${sequence.velocity} mm/s (${sequence.points.length} points)`);
+        }
+    }
+    
+    // Update sequences view
+    updateSequencesView() {
+        if (!this.sequencesContainer) return;
+        
+        const sequences = this.identifySequences();
+        this.sequencesContainer.innerHTML = '';
+        
+        if (sequences.length === 0) {
+            this.sequencesContainer.innerHTML = '<p style="padding: 20px; text-align: center; color: var(--text-secondary);">Nessuna sequenza disponibile</p>';
+            if (this.sequencesCountDisplay) {
+                this.sequencesCountDisplay.textContent = '0 sequenze';
+            }
+            return;
+        }
+        
+        sequences.forEach((seq, seqIndex) => {
+            const sequenceCard = document.createElement('div');
+            sequenceCard.className = 'sequence-card';
+            sequenceCard.dataset.seqIndex = seqIndex;
+            
+            // Calculate sequence length
+            let sequenceLength = 0;
+            for (let i = seq.startIndex; i < seq.endIndex; i++) {
+                const p1 = this.splinePoints[i];
+                const p2 = this.splinePoints[i + 1];
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                sequenceLength += Math.sqrt(dx * dx + dy * dy);
+            }
+            
+            const duration = sequenceLength / seq.velocity; // seconds
+            
+            sequenceCard.innerHTML = `
+                <div class="sequence-header">
+                    <div class="sequence-title">
+                        <span class="sequence-number">Sequenza ${seqIndex + 1}</span>
+                        <div class="sequence-velocity-edit">
+                            <input type="number" class="sequence-velocity-input" data-seq-index="${seqIndex}" value="${seq.velocity.toFixed(1)}" min="0" step="0.1" title="Velocità (mm/s)">
+                            <span class="velocity-unit">mm/s</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-small sequence-select" data-seq-index="${seqIndex}">
+                        <span class="material-symbols-outlined">select_all</span> Seleziona
+                    </button>
+                </div>
+                <div class="sequence-info">
+                    <span><strong>Punti:</strong> ${seq.points.length} (ID ${seq.startIndex + 1} - ${seq.endIndex + 1})</span>
+                    <span><strong>Lunghezza:</strong> ${sequenceLength.toFixed(1)} mm</span>
+                    <span><strong>Durata:</strong> ${duration.toFixed(2)} s</span>
+                </div>
+            `;
+            
+            this.sequencesContainer.appendChild(sequenceCard);
+        });
+        
+        // Update count
+        if (this.sequencesCountDisplay) {
+            this.sequencesCountDisplay.textContent = `${sequences.length} sequenz${sequences.length === 1 ? 'a' : 'e'}`;
+        }
+        
+        // Add event listeners for select buttons
+        document.querySelectorAll('.sequence-select').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const seqIndex = parseInt(e.currentTarget.dataset.seqIndex);
+                this.selectSequence(seqIndex);
+            });
+        });
+        
+        // Add event listeners for velocity inputs
+        document.querySelectorAll('.sequence-velocity-input').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const seqIndex = parseInt(e.target.dataset.seqIndex);
+                const newVelocity = parseFloat(e.target.value);
+                if (!isNaN(newVelocity) && newVelocity >= 0) {
+                    this.updateSequenceVelocity(seqIndex, newVelocity);
+                }
+            });
+            
+            input.addEventListener('blur', (e) => {
+                const value = parseFloat(e.target.value);
+                if (isNaN(value) || value < 0) {
+                    const seqIndex = parseInt(e.target.dataset.seqIndex);
+                    const sequences = this.identifySequences();
+                    if (sequences[seqIndex]) {
+                        e.target.value = sequences[seqIndex].velocity.toFixed(1);
+                    }
+                }
+            });
+        });
+        
+        // Add hover highlight functionality
+        const highlightCheckbox = document.getElementById('highlightSequencesOnHover');
+        if (highlightCheckbox && highlightCheckbox.checked) {
+            document.querySelectorAll('.sequence-card').forEach(card => {
+                card.addEventListener('mouseenter', (e) => {
+                    const seqIndex = parseInt(e.currentTarget.dataset.seqIndex);
+                    this.highlightSequenceInTable(seqIndex, true);
+                });
+                
+                card.addEventListener('mouseleave', (e) => {
+                    const seqIndex = parseInt(e.currentTarget.dataset.seqIndex);
+                    this.highlightSequenceInTable(seqIndex, false);
+                });
+            });
+        }
+    }
+    
+    // Update velocity for all points in a sequence
+    updateSequenceVelocity(seqIndex, newVelocity) {
+        const sequences = this.identifySequences();
+        if (seqIndex < 0 || seqIndex >= sequences.length) return;
+        
+        const sequence = sequences[seqIndex];
+        
+        // Update velocity for all points in the sequence
+        sequence.points.forEach(pointIndex => {
+            this.splinePoints[pointIndex].velocity = newVelocity;
+        });
+        
+        // Update the spline table to reflect changes
+        this.updateSplineTable();
+        
+        // Refresh sequences view to update duration
+        this.updateSequencesView();
+        
+        console.log(`Updated sequence ${seqIndex + 1} velocity to ${newVelocity} mm/s`);
+    }
+    
+    // Highlight sequence rows in the table
+    highlightSequenceInTable(seqIndex, highlight) {
+        const sequences = this.identifySequences();
+        if (seqIndex < 0 || seqIndex >= sequences.length) return;
+        
+        const sequence = sequences[seqIndex];
+        
+        // Find all table rows for this sequence
+        document.querySelectorAll('#splineTableBody tr').forEach((row, rowIndex) => {
+            if (sequence.points.includes(rowIndex)) {
+                if (highlight) {
+                    row.classList.add('sequence-highlighted');
+                } else {
+                    row.classList.remove('sequence-highlighted');
+                }
+            }
+        });
+    }
+    
+    // Select a specific sequence by index
+    selectSequence(seqIndex) {
+        const sequences = this.identifySequences();
+        if (seqIndex < 0 || seqIndex >= sequences.length) return;
+        
+        const sequence = sequences[seqIndex];
+        
+        // Clear current selection
+        this.selectedPoints.clear();
+        
+        // Select all points in the sequence
+        sequence.points.forEach(index => {
+            this.selectedPoints.add(index);
+        });
+        
+        // Switch to spline tab to show selection
+        this.switchTab('spline-tab');
+        
+        this.updateSplineTable();
+        this.updateSelectionInfo();
+        this.highlightSelectedPoints();
+        
+        console.log(`Selected sequence ${seqIndex + 1} with ${sequence.points.length} points`);
     }
 
     updateSplineTable() {
         if (!this.splineTableBody) return;
         
         this.splineTableBody.innerHTML = '';
+        
+        // Get sequences to apply visual grouping
+        const sequences = this.identifySequences();
+        // Use semi-transparent colors that work in both light and dark modes
+        const sequenceColors = [
+            'rgba(102, 126, 234, 0.1)',  // blue
+            'rgba(234, 102, 126, 0.1)',  // red
+            'rgba(102, 234, 126, 0.1)',  // green
+            'rgba(234, 200, 102, 0.1)',  // yellow
+            'rgba(200, 102, 234, 0.1)'   // purple
+        ];
         
         this.splinePoints.forEach((point, index) => {
             if (!point.velocity) point.velocity = 30; // Default velocity in mm/s
@@ -1345,12 +1617,20 @@ class SplineGenerator {
             const row = document.createElement('tr');
             const isSelected = this.selectedPoints.has(index);
             if (isSelected) row.classList.add('selected');
+            
+            // Find which sequence this point belongs to
+            const seqIndex = sequences.findIndex(seq => seq.points.includes(index));
+            if (seqIndex >= 0) {
+                row.dataset.sequenceIndex = seqIndex;
+                row.style.setProperty('--sequence-color', sequenceColors[seqIndex % sequenceColors.length]);
+                row.classList.add('sequence-row');
+            }
 
             row.innerHTML = `
                 <td><input type="checkbox" class="point-checkbox" data-index="${index}" ${isSelected ? 'checked' : ''}></td>
                 <td>${point.id}</td>
-                <td><input type="number" class="coord-input" data-index="${index}" data-coord="x" value="${point.x.toFixed(2)}" step="0.1"></td>
                 <td><input type="number" class="coord-input" data-index="${index}" data-coord="y" value="${point.y.toFixed(2)}" step="0.1"></td>
+                <td><input type="number" class="coord-input" data-index="${index}" data-coord="x" value="${point.x.toFixed(2)}" step="0.1"></td>
                 <td><input type="number" class="velocity-input" data-index="${index}" value="${point.velocity}" min="0" step="0.1"></td>
                 <td>
                     <button class="btn-mini edit" onclick="window.splineApp.focusPoint(${index})">📍</button>
@@ -1418,6 +1698,12 @@ class SplineGenerator {
         this.updateSelectedCount();
         this.updateSplineLength();
         this.highlightSelectedPoints();
+        
+        // Update sequences view if sequences tab is active
+        const sequencesTab = document.getElementById('sequences-tab');
+        if (sequencesTab && sequencesTab.classList.contains('active')) {
+            this.updateSequencesView();
+        }
     }
 
     updatePointCount() {
