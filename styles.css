@@ -51,33 +51,96 @@ header h1 {
 .play-group {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 5px 10px;
-    background: rgba(0,255,100,0.1);
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--card-bg);
     border-radius: 8px;
-    border: 1px solid rgba(0,255,100,0.3);
+    border: 1px solid var(--border-color);
+}
+
+.playback-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.playback-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.speed-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.speed-slider {
+    width: 80px;
+    cursor: pointer;
+}
+
+.speed-display {
+    font-size: 11px;
+    min-width: 32px;
+    display: inline-block;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.progress-slider {
+    flex: 1;
+    min-width: 150px;
+    cursor: pointer;
+}
+
+.progress-control {
+    width: 100%;
+    padding: 2px 0;
+}
+
+.progress-control input[type="range"] {
+    cursor: pointer;
 }
 
 .play-group span {
-    color: #00ff64;
-    font-weight: bold;
+    color: var(--text-primary);
+    font-weight: 600;
 }
 
 .play-btn {
-    background: linear-gradient(135deg, #00ff64, #00cc50) !important;
-    color: white !important;
-    border: none !important;
-    padding: 8px 12px !important;
+    background: var(--button-bg) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color) !important;
+    padding: 6px 8px !important;
     border-radius: 6px !important;
-    font-size: 14px !important;
+    font-size: 18px !important;
     cursor: pointer !important;
-    transition: all 0.3s ease !important;
+    transition: all 0.2s ease !important;
+    min-width: 36px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.play-btn .material-symbols-outlined {
+    font-size: 20px;
 }
 
 .play-btn:hover {
-    background: linear-gradient(135deg, #00cc50, #009940) !important;
+    background: var(--button-hover) !important;
     transform: translateY(-1px) !important;
-    box-shadow: 0 4px 8px rgba(0,255,100,0.3) !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+}
+
+.play-btn:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
 }
 
 .time-indicator {

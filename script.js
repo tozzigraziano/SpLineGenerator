@@ -79,6 +79,9 @@ class SplineGenerator {
         this.pauseBtn = document.getElementById('pauseBtn');
         this.stopBtn = document.getElementById('stopBtn');
         this.timeDisplay = document.getElementById('timeDisplay');
+        this.speedSlider = document.getElementById('speedSlider');
+        this.speedDisplay = document.getElementById('speedDisplay');
+        this.progressSlider = document.getElementById('progressSlider');
         
         // Export elements
         this.robotType = document.getElementById('robotType');
@@ -157,6 +160,10 @@ class SplineGenerator {
         // Initialize multiple paths storage
         this.programPaths = {}; // Object to store multiple paths indexed by program number
         this.currentProgramIndex = 1; // Currently selected program index
+        
+        // Playback control state
+        this.playbackSpeed = 1.0;
+        this.isManualSeeking = false;
     }
 
     initializeCanvases() {
@@ -285,6 +292,49 @@ class SplineGenerator {
         
         if (this.stopBtn) {
             this.stopBtn.addEventListener('click', () => this.stopAnimation());
+        }
+        
+        // Speed control
+        if (this.speedSlider) {
+            this.speedSlider.addEventListener('input', (e) => {
+                this.playbackSpeed = parseFloat(e.target.value);
+                this.speedDisplay.textContent = `${this.playbackSpeed.toFixed(2)}x`;
+            });
+            
+            // Mouse wheel support for speed slider
+            this.speedSlider.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -0.05 : 0.05;
+                const newValue = Math.max(0.05, Math.min(2, this.playbackSpeed + delta));
+                this.speedSlider.value = newValue;
+                this.playbackSpeed = newValue;
+                this.speedDisplay.textContent = `${this.playbackSpeed.toFixed(2)}x`;
+            });
+        }
+        
+        // Progress control
+        if (this.progressSlider) {
+            this.progressSlider.addEventListener('input', (e) => {
+                this.isManualSeeking = true;
+                const progress = parseFloat(e.target.value) / 1000; // 0 to 1
+                this.seekToProgress(progress);
+            });
+            
+            this.progressSlider.addEventListener('change', () => {
+                this.isManualSeeking = false;
+            });
+            
+            // Mouse wheel support for progress slider
+            this.progressSlider.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -10 : 10; // Move by 10 units (out of 1000)
+                const newValue = Math.max(0, Math.min(1000, parseInt(this.progressSlider.value) + delta));
+                this.progressSlider.value = newValue;
+                this.isManualSeeking = true;
+                const progress = newValue / 1000;
+                this.seekToProgress(progress);
+                setTimeout(() => { this.isManualSeeking = false; }, 100);
+            });
         }
         
         // Export button
@@ -3136,15 +3186,16 @@ class SplineGenerator {
             this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
             this.animationProgress = 0;
             this.totalAnimationTime = this.calculateTotalAnimationTime();
-            this.pausedTime = 0;
+            this.virtualElapsedTime = 0;
             this.updateTimeDisplay(0);
         } else {
             // Resuming from pause
             this.isPaused = false;
         }
         
-        // Set start time accounting for paused time
-        this.animationStartTime = performance.now() - this.pausedTime;
+        // Set start time for real time tracking
+        this.animationStartTime = performance.now();
+        this.lastFrameTime = this.animationStartTime;
         
         // Update button visibility
         this.playBtn.style.display = 'none';
@@ -3156,9 +3207,6 @@ class SplineGenerator {
     pauseAnimation() {
         this.isPaused = true;
         this.isAnimating = false;
-        
-        // Save the elapsed time when pausing
-        this.pausedTime = performance.now() - this.animationStartTime;
         
         if (this.animationRequestId) {
             cancelAnimationFrame(this.animationRequestId);
@@ -3174,7 +3222,7 @@ class SplineGenerator {
         this.isAnimating = false;
         this.isPaused = false;
         this.animationProgress = 0;
-        this.pausedTime = 0;
+        this.virtualElapsedTime = 0;
         
         if (this.animationRequestId) {
             cancelAnimationFrame(this.animationRequestId);
@@ -3187,25 +3235,64 @@ class SplineGenerator {
         // Reset time display
         this.updateTimeDisplay(0);
         
+        // Reset progress slider
+        if (this.progressSlider) {
+            this.progressSlider.value = 0;
+        }
+        
         // Update button visibility
         this.playBtn.style.display = 'inline-block';
         this.pauseBtn.style.display = 'none';
+    }
+    
+    seekToProgress(progress) {
+        // Calculate elapsed time based on progress (0 to 1)
+        const targetTime = progress * this.totalAnimationTime;
+        
+        // Update virtual elapsed time
+        this.virtualElapsedTime = targetTime;
+        
+        // Reset frame time for smooth continuation
+        if (this.isAnimating) {
+            this.lastFrameTime = performance.now();
+        }
+        
+        // Clear and redraw at new position
+        this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        
+        const position = this.calculateAnimationPosition(targetTime);
+        if (position) {
+            this.drawAnimatedSpline(position.segmentIndex, position.progress);
+            this.drawPositionIndicator(position.x, position.y);
+        }
+        
+        this.updateTimeDisplay(targetTime);
     }
     
     animate() {
         if (!this.isAnimating) return;
         
         const currentTime = performance.now();
-        const elapsedTime = currentTime - this.animationStartTime;
+        const deltaTime = currentTime - this.lastFrameTime;
+        this.lastFrameTime = currentTime;
+        
+        // Advance virtual time based on real delta time and playback speed
+        this.virtualElapsedTime += deltaTime * this.playbackSpeed;
         
         // Update time display
-        this.updateTimeDisplay(elapsedTime);
+        this.updateTimeDisplay(this.virtualElapsedTime);
+        
+        // Update progress slider (if not manually seeking)
+        if (!this.isManualSeeking && this.progressSlider && this.totalAnimationTime > 0) {
+            const progress = Math.min(1, this.virtualElapsedTime / this.totalAnimationTime);
+            this.progressSlider.value = Math.round(progress * 1000);
+        }
         
         // Clear animation canvas
         this.animationCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
         
         // Calculate current position based on velocity
-        const position = this.calculateAnimationPosition(elapsedTime);
+        const position = this.calculateAnimationPosition(this.virtualElapsedTime);
         
         if (position) {
             // Draw animated spline up to current position
@@ -3216,7 +3303,7 @@ class SplineGenerator {
         }
         
         // Continue animation if not finished
-        if (elapsedTime < this.totalAnimationTime) {
+        if (this.virtualElapsedTime < this.totalAnimationTime) {
             this.animationRequestId = requestAnimationFrame(() => this.animate());
         } else {
             // Animation finished - show complete spline and final position
