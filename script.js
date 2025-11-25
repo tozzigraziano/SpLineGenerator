@@ -164,6 +164,11 @@ class SplineGenerator {
         // Playback control state
         this.playbackSpeed = 1.0;
         this.isManualSeeking = false;
+        
+        // Selection box state
+        this.isSelectDragging = false;
+        this.selectBoxStart = null;
+        this.selectBoxEnd = null;
     }
 
     initializeCanvases() {
@@ -914,7 +919,7 @@ class SplineGenerator {
             this.highlightSelectedPoints();
             this.scrollToPointInTable(clickedPointIndex);
         } else {
-            // Clicked on empty space - clear selection unless holding Ctrl
+            // Clicked on empty space - start selection box
             if (!e.ctrlKey) {
                 this.selectedPoints.clear();
                 document.querySelectorAll('.point-checkbox').forEach(checkbox => {
@@ -924,6 +929,11 @@ class SplineGenerator {
                 this.updateTableSelection();
                 this.highlightSelectedPoints();
             }
+            
+            // Start drag selection
+            this.isSelectDragging = true;
+            this.selectBoxStart = { x: canvasX, y: canvasY };
+            this.selectBoxEnd = { x: canvasX, y: canvasY };
         }
     }
 
@@ -938,6 +948,16 @@ class SplineGenerator {
             this.updateCoordinates(rawWorldPos, snappedWorldPos);
         } else {
             this.updateCoordinates(snappedWorldPos);
+        }
+        
+        // Handle selection box dragging
+        if (this.isSelectDragging && this.currentTool === 'select') {
+            const rect = this.splineCanvas.getBoundingClientRect();
+            const canvasX = e.clientX - rect.left;
+            const canvasY = e.clientY - rect.top;
+            this.selectBoxEnd = { x: canvasX, y: canvasY };
+            this.drawSelectionBox();
+            return;
         }
         
         if (this.isMouseDown && this.currentTool !== 'select') {
@@ -1055,6 +1075,18 @@ class SplineGenerator {
     }
 
     handleMouseUp(e) {
+        // Handle selection box completion
+        if (this.isSelectDragging && this.currentTool === 'select') {
+            this.finishSelectionBox(e);
+            this.isSelectDragging = false;
+            this.selectBoxStart = null;
+            this.selectBoxEnd = null;
+            this.splineCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+            this.drawSpline();
+            this.highlightSelectedPoints();
+            return;
+        }
+        
         if (this.isMouseDown && this.currentTool !== 'select') {
             const worldPos = this.getMousePosition(e);
             
@@ -2106,6 +2138,67 @@ class SplineGenerator {
     clearSequenceHighlightOnCanvas() {
         this.drawSpline();
         this.highlightSelectedPoints();
+    }
+    
+    drawSelectionBox() {
+        if (!this.selectBoxStart || !this.selectBoxEnd) return;
+        
+        // Clear and redraw spline
+        this.splineCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        this.drawSpline();
+        this.highlightSelectedPoints();
+        
+        // Draw selection rectangle
+        this.splineCtx.save();
+        this.splineCtx.strokeStyle = '#667eea';
+        this.splineCtx.fillStyle = 'rgba(102, 126, 234, 0.1)';
+        this.splineCtx.lineWidth = 2;
+        this.splineCtx.setLineDash([5, 5]);
+        
+        const x = Math.min(this.selectBoxStart.x, this.selectBoxEnd.x);
+        const y = Math.min(this.selectBoxStart.y, this.selectBoxEnd.y);
+        const width = Math.abs(this.selectBoxEnd.x - this.selectBoxStart.x);
+        const height = Math.abs(this.selectBoxEnd.y - this.selectBoxStart.y);
+        
+        this.splineCtx.fillRect(x, y, width, height);
+        this.splineCtx.strokeRect(x, y, width, height);
+        this.splineCtx.restore();
+    }
+    
+    finishSelectionBox(e) {
+        if (!this.selectBoxStart || !this.selectBoxEnd) return;
+        
+        const minX = Math.min(this.selectBoxStart.x, this.selectBoxEnd.x);
+        const maxX = Math.max(this.selectBoxStart.x, this.selectBoxEnd.x);
+        const minY = Math.min(this.selectBoxStart.y, this.selectBoxEnd.y);
+        const maxY = Math.max(this.selectBoxStart.y, this.selectBoxEnd.y);
+        
+        // Find all points within the selection box
+        const pointsInBox = [];
+        this.splinePoints.forEach((point, index) => {
+            const screenPos = this.worldToScreen(point.x, point.y);
+            if (screenPos.x >= minX && screenPos.x <= maxX &&
+                screenPos.y >= minY && screenPos.y <= maxY) {
+                pointsInBox.push(index);
+            }
+        });
+        
+        // Select the points
+        if (!e.ctrlKey) {
+            this.selectedPoints.clear();
+        }
+        
+        pointsInBox.forEach(index => {
+            this.selectedPoints.add(index);
+        });
+        
+        // Update checkboxes
+        document.querySelectorAll('.point-checkbox').forEach((checkbox, index) => {
+            checkbox.checked = this.selectedPoints.has(index);
+        });
+        
+        this.updateSelectedCount();
+        this.updateTableSelection();
     }
 
     updateSelectedCount() {
