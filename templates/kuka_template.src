@@ -1,11 +1,14 @@
-DEF {{PROJECT_NAME}}(lp0: IN, lTool: IN, lBase: IN)
+DEF {{PROJECT_NAME}}(lp0: IN, lTool: IN, lBase: IN, rSpeedFactor: IN)
     E6POS lp0
     FRAME lTool, lBase
     INT liIdx
+    REAL rSpeedFactor
     
-    ; Calculate positions relative to base
+    ; Calculate positions and speed relative to base
     FOR liIdx = 1 TO {{NUM_POINTS}}
         pMove[liIdx] = pToolOffset(lp0, pSpl[liIdx].X, pSpl[liIdx].Y, pSpl[liIdx].Z, 0, 0, 0)
+        cpMove[liIdx] = cpSpl[liIdx]
+        cpMove[liIdx].CP = cpSpl[liIdx].CP * rSpeedFactor
     ENDFOR
     
     $TOOL=lTool

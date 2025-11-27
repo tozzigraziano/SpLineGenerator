@@ -7,7 +7,15 @@ DEFDAT  {{PROJECT_NAME}} PUBLIC
 DECL FRAME pSpl[{{NUM_POINTS}}]
 {{FRAME_POSITIONS}}
 
+; speed data from SpLine Generator
+DECL CP cpSpl[{{NUM_POINTS}}]
+{{SPL_SPEED_DATA}}
+
 ; calculated points
 DECL E6POS pMove[{{NUM_POINTS}}]
 {{MOVE_POSITIONS}}
+
+; calculated speed data
+DECL CP cpMove[{{NUM_POINTS}}]
+{{MOVE_SPEED_DATA}}
 ENDDAT

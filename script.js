@@ -3875,18 +3875,29 @@ DEFDAT  {{PROJECT_NAME}} PUBLIC
 DECL FRAME pSpl[{{NUM_POINTS}}]
 {{FRAME_POSITIONS}}
 
+; speed data from SpLine Generator
+DECL CP cpSpl[{{NUM_POINTS}}]
+{{SPL_SPEED_DATA}}
+
 ; calculated points
 DECL E6POS pMove[{{NUM_POINTS}}]
 {{MOVE_POSITIONS}}
+
+; calculated speed data
+DECL CP cpMove[{{NUM_POINTS}}]
+{{MOVE_SPEED_DATA}}
 ENDDAT`,
-            src: `DEF {{PROJECT_NAME}}(lp0: IN, lTool: IN, lBase: IN)
+            src: `DEF {{PROJECT_NAME}}(lp0: IN, lTool: IN, lBase: IN, rSpeedFactor: IN)
     E6POS lp0
     FRAME lTool, lBase
     INT liIdx
+    REAL rSpeedFactor
     
-    ; Calculate positions relative to base
+    ; Calculate positions and speed relative to base
     FOR liIdx = 1 TO {{NUM_POINTS}}
         pMove[liIdx] = pToolOffset(lp0, pSpl[liIdx].X, pSpl[liIdx].Y, pSpl[liIdx].Z, 0, 0, 0)
+        cpMove[liIdx] = cpSpl[liIdx]
+        cpMove[liIdx].CP = cpSpl[liIdx].CP * rSpeedFactor
     ENDFOR
     
     $TOOL=lTool
@@ -3929,6 +3940,8 @@ END`
         // Generate FRAME positions using axis labels and MOVE positions (all zeros)
         let framePositions = '';
         let movePositions = '';
+        let splSpeedData = '';
+        let moveSpeedData = '';
         let splinePointIndex = 1;
         for (let i = 0; i < this.splinePoints.length; i++) {
             const point = this.splinePoints[i];
@@ -3958,8 +3971,14 @@ END`
                 kukaZ = point.y;
             }
             
+            // Convert velocity from mm/s to m/s (divide by 1000)
+            const velocity = (point.velocity || 30);
+            const velocityInMetersPerSec = velocity / 1000;
+            
             framePositions += `pSpl[${splinePointIndex}]={X ${kukaX.toFixed(1)},Y ${kukaY.toFixed(1)},Z ${kukaZ.toFixed(1)},A 0.0,B 0.0,C 0.0}\n`;
             movePositions += `pMove[${splinePointIndex}]={X 0.0,Y 0.0,Z 0.0,A 0.0,B 0.0,C 0.0,S 0,T 0,E1 0.0,E2 0.0,E3 0.0,E4 0.0,E5 0.0,E6 0.0}\n`;
+            splSpeedData += `cpSpl[${splinePointIndex}]={CP ${velocityInMetersPerSec.toFixed(4)},ORI1 45.0000,ORI2 45.0000}\n`;
+            moveSpeedData += `cpMove[${splinePointIndex}]={CP 0.0,ORI1 0.0,ORI2 0.0}\n`;
 
             splinePointIndex ++;
         }
@@ -3969,7 +3988,9 @@ END`
             .replace(/\{\{PROJECT_NAME\}\}/g, projectName)
             .replace(/\{\{NUM_POINTS\}\}/g, numPoints.toString())
             .replace(/\{\{FRAME_POSITIONS\}\}/g, framePositions.trim())
-            .replace(/\{\{MOVE_POSITIONS\}\}/g, movePositions.trim());
+            .replace(/\{\{MOVE_POSITIONS\}\}/g, movePositions.trim())
+            .replace(/\{\{SPL_SPEED_DATA\}\}/g, splSpeedData.trim())
+            .replace(/\{\{MOVE_SPEED_DATA\}\}/g, moveSpeedData.trim());
     }
     
     generateKukaSrcFromTemplate(projectName, template, description = '') {
@@ -3986,19 +4007,18 @@ END`
             descriptionComment += ';\n';
         }
         
-        // Generate spline points
+        // Generate spline points using cpMove array for velocity
         let splinePoints = '';
         let firstSplinePoint = true;
         let splinePointIndex = 1;
         for (let i = 0; i < this.splinePoints.length; i++) {
             const point = this.splinePoints[i];
-            const velocity = (point.velocity || 30) / 1000; // Convert mm/s to m/s
             
             if (firstSplinePoint) {
                 splinePoints += '    SPLINE\n';
-                splinePoints += `        SPL pMove[${splinePointIndex}] WITH $ORI_TYPE = #CONSTANT, $VEL = {CP ${velocity.toFixed(3)},ORI1 45.0000,ORI2 45.0000}\n`;
+                splinePoints += `        SPL pMove[${splinePointIndex}] WITH $ORI_TYPE = #CONSTANT, $VEL = cpMove[${splinePointIndex}]\n`;
             } else {
-                splinePoints += `        SPL pMove[${splinePointIndex}] WITH $VEL = {CP ${velocity.toFixed(3)},ORI1 45.0000,ORI2 45.0000}\n`;
+                splinePoints += `        SPL pMove[${splinePointIndex}] WITH $VEL = cpMove[${splinePointIndex}]\n`;
             }
             firstSplinePoint = false;
 
